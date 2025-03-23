@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap');
+
+body {
+    font-family: 'kanit', sans-serif;
+    color: #2D336B;
+    margin: 0;
+    padding: 0;
+    background-color:#e4e3f0; 
+}
+
+.card-title{
+    color: #2D336B;
+
+}
+
+.kirim-button {
+    background-color:#2D336B; /* Green */
+    color: white;
+    border: none;
+  }
+  
+  .kirim-button:hover {
+    background-color:#a8b0f0; /* Darker Green */
+  }
+  .custom-thead {
+    background-color: #2D336B;
+    color: white;
+  }
+
+
+  
+  /* Table Container */
+.table-responsive {
+    margin-top: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0px 4px 8px rgba(88, 79, 160, 0.753);
+  }
+  
+  /* Custom Table */
+  .custom-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: white;
+  }
+  
+  /* Table Header */
+  .custom-thead {
+    background-color: #2D336B !important;
+    color: white !important;
+    text-transform: uppercase;
+  }
+  
+  /* Table Rows */
+  .custom-table tbody tr {
+    transition: all 0.3s ease-in-out;
+  }
+  
+  .custom-table tbody tr:hover {
+    background-color: #f1f1f1;
+  }
+  
+  /* Table Borders */
+  .custom-table th, .custom-table td {
+    border: 1px solid #b8bbd8 !important;
+    padding: 10px;
+    text-align: center;
+  }
+  
+  /* Responsive Font */
+  .custom-table th {
+    font-size: 14px;
+    color: #2D336B;
+  }
+  
+  .custom-table td {
+    font-size: 14px;
+  }
+  
+  /* Alternating Row Colors */
+  .custom-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  

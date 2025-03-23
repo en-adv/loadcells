@@ -1,0 +1,27 @@
+.operator-diskon {
+    padding: 20px;
+}
+
+.dashboard-grid {
+    margin-bottom: 20px;
+}
+
+.input-container {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.submit-button {
+    margin-top: 10px;
+}
+
+.search-bar {
+    margin-top: 10px;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
