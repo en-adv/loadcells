@@ -24,20 +24,20 @@ const Login = ({ setAuth }) => {
                 case "admin":
                     navigate("/admin");
                     break;
-                case "operator1":
-                    navigate("/operator1");
+                case "Sigalagala":
+                    navigate("/Sigalagala");
                     break;
-                case "operator2":
-                    navigate("/operator2");
+                case "Hapung":
+                    navigate("/Hapung");
                     break;
-                case "operator3":
-                    navigate("/operator3");
+                case "Paranjulu":
+                    navigate("/Paranjulu");
                     break;
-                case "operator4":
-                    navigate("/operator4");
+                case "Binanga":
+                    navigate("/Binanga");
                     break;
-                case "operator5":
-                    navigate("/operator5");
+                case "Portibi":
+                    navigate("/Portibi");
                     break;
                 default:
                     navigate("/login");

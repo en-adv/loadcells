@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
+
 const API_URL = process.env.REACT_APP_API_URL;
+
 const OperatorDiscount = () => {
     const [discount, setDiscount] = useState(0);
     const [operator, setOperator] = useState("");
@@ -9,7 +11,8 @@ const OperatorDiscount = () => {
     // Fetch logged-in operator role
     useEffect(() => {
         const storedRole = localStorage.getItem("role");
-        if (storedRole && storedRole.startsWith("operator")) {
+        const validOperators = ["Sigalagala", "Hapung", "Paranjulu", "Binanga", "Portibi"];
+        if (storedRole && validOperators.includes(storedRole)) {
             setOperator(storedRole);
         }
     }, []);
@@ -56,7 +59,7 @@ const OperatorDiscount = () => {
                         type="number"
                         className="form-control"
                         value={discount}
-                        onChange={(e) => setDiscount(e.target.value)}
+                        onChange={(e) => setDiscount(Number(e.target.value))}
                     />
                     <button 
                         className="btn mt-3 w-100"

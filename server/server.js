@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import mongoose from 'mongoose';
+import mongoose from "mongoose";  // ✅ Correct;
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';

@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+
 
 const PriceSchema = new mongoose.Schema({
     date: { type: String, required: true }, // e.g., "15-3-2025"

@@ -9,8 +9,7 @@ const vehicleSchema = new mongoose.Schema({
     totalPrice: { type: Number, default: 0 },  
     discount: { type: Number, default: 0 },
     operator: { type: String, required: true },
-    date: { type: Date, default: Date.now } // ✅ Add date field with default value
+    date: { type: Date, default: Date.now } 
 });
 
-const Vehicle = mongoose.model("Vehicle", vehicleSchema);
-export default Vehicle;
+export default mongoose.model("Vehicle", vehicleSchema);

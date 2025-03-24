@@ -65,40 +65,40 @@ const App = () => {
                 )}
 
                 {/* 🔹 Operator Routes (Dynamic for 5 Operators) */}
-                {auth === "operator1" && (
-                    <Route path="/operator1/*" element={<Layout />}>
+                {auth === "Sigalagala" && (
+                    <Route path="/Sigalagala/*" element={<Layout />}>
                         <Route index element={<OperatorDashboard1 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
                     </Route>
                 )}
 
-                {auth === "operator2" && (
-                    <Route path="/operator2/*" element={<Layout />}>
+                {auth === "Hapung" && (
+                    <Route path="/Hapung/*" element={<Layout />}>
                         <Route index element={<OperatorDashboard2 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
                     </Route>
                 )}
 
-                {auth === "operator3" && (
-                    <Route path="/operator3/*" element={<Layout />}>
+                {auth === "Paranjulu" && (
+                    <Route path="/Paranjulu/*" element={<Layout />}>
                         <Route index element={<OperatorDashboard3 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
                     </Route>
                 )}
 
-                {auth === "operator4" && (
-                    <Route path="/operator4/*" element={<Layout />}>
+                {auth === "Binanga" && (
+                    <Route path="/Binanga/*" element={<Layout />}>
                         <Route index element={<OperatorDashboard4 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
                     </Route>
                 )}
 
-                {auth === "operator5" && (
-                    <Route path="/operator5/*" element={<Layout />}>
+                {auth === "Portibi" && (
+                    <Route path="/Portibi/*" element={<Layout />}>
                         <Route index element={<OperatorDashboard5 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />

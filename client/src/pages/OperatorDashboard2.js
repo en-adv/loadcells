@@ -20,7 +20,7 @@ const OperatorDashboard2 = () => {
 
     // Fetch Load Cell Data from Firebase
     useEffect(() => {
-        const loadCellRef = ref(db, "timbangan/lokasi2/berat");
+        const loadCellRef = ref(db, "timbangan/Hapung/berat");
         onValue(loadCellRef, (snapshot) => {
             if (snapshot.exists()) {
                 setLoadCell(snapshot.val());
@@ -47,7 +47,7 @@ const OperatorDashboard2 = () => {
     }, []);
 
     useEffect(() => {
-        const operator = "operator2";  // Make sure it's dynamically assigned
+        const operator = "Hapung";  // Make sure it's dynamically assigned
         axios.get(`${API_URL}/api/discount/${operator}`)
             .then((res) => {
                 console.log("Fetched Discount Response:", res.data); // Debugging
@@ -61,7 +61,7 @@ const OperatorDashboard2 = () => {
     }, []);
 
     useEffect(() => {
-        const operator = "operator2"; // Ensure this is dynamically set later
+        const operator = "Hapung"; // Ensure this is dynamically set later
         const total = vehicles
             .filter(vehicle => vehicle.operator === operator)
             .reduce((sum, vehicle) => sum + (vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0), 0);
@@ -92,7 +92,7 @@ const OperatorDashboard2 = () => {
             return;
         }
     
-        const operator = "operator2";  // ✅ Replace this with actual logged-in operator
+        const operator = "Hapung";  // ✅ Replace this with actual logged-in operator
     
         const payload = {
             plateNumber,
@@ -100,7 +100,7 @@ const OperatorDashboard2 = () => {
             type: selectedType,
             pricePerKg,
             discount,
-            operator,// ✅ Send operator field
+            operator,
         };
     
         axios.post(`${API_URL}/api/vehicles`, payload)
@@ -215,40 +215,56 @@ const OperatorDashboard2 = () => {
                  <table className="table custom-table">
                <thead className="custom-thead">    
                         <tr>
-                            <th>Nomor Plat</th>
-                            <th>Bruto (kg)</th>
-                            <th>Tar (kg)</th>
-                            <th>Netto (kg)</th>
-                            <th>Harga</th>
-                            <th>Netto X Harga</th>
-                            <th>Diskon %</th>
-                            <th>Total Harga (Rp)</th>
+                            <th>Tanggal</th>
+                            <th>Nomor Polisi</th>
+                            <th>Brutto</th>
+                            <th>Tarra</th>
+                            <th>Netto</th>
+                            <th>Potongan (%)</th>       
+                            <th>Harga/Kg</th>
+                            <th>Netto x Harga</th>
+                            <th>Total </th>
                         </tr>
                     </thead>
                     <tbody>
-                        {vehicles
-                            .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
-                            .map((vehicle, index) => {
-                                const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-                                const totalPrice = netto * pricePerKg;
-                                const discountAmount = (totalPrice * {discount}) / 100;
-                                const finalPrice = vehicle.totalPrice - discountAmount;
-                                const harga = netto * vehicle.pricePerKg;
-                                return (
-                                    <tr key={index}>
-                                        <td>{vehicle.plateNumber}</td>
-                                        <td>{vehicle.bruto || "-"} Kg</td>
-                                        <td>{vehicle.tar || "-"} Kg</td>
-                                        <td>{netto || "-"} Kg</td> 
-                                        <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
-                                        <td>Rp {harga.toLocaleString() || "-"}</td>
-                                        <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
+    {vehicles
+        .filter(vehicle => vehicle.operator === "Hapung") // Adjust for dynamic operator filtering
+        .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
+        .map((vehicle, index) => {
+            const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
+            const totalPrice = netto * pricePerKg;
+            const discountAmount = (totalPrice * discount) / 100;
+            const finalPrice = totalPrice - discountAmount;
+            const harga = netto * vehicle.pricePerKg;
 
-                                        <td>Rp {vehicle.totalPrice.toLocaleString()}</td>
-                                    </tr>
-                                );
-                            })}
-                    </tbody>
+            // ✅ Extract and Format the Date
+            const formattedDate = vehicle.date
+                ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
+                    day: "2-digit", 
+                    month: "2-digit", 
+                    year: "numeric", 
+                    hour: "2-digit", 
+                    minute: "2-digit", 
+                    second: "2-digit" 
+                  }) 
+                : "-";
+
+            return (
+                <tr key={index}>
+                    <td>{formattedDate}</td>
+                    <td>{vehicle.plateNumber}</td>
+                    <td>{vehicle.bruto || "-"} Kg</td>
+                    <td>{vehicle.tar || "-"} Kg</td>
+                    <td>{netto || "-"} Kg</td> 
+                    <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
+                    <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
+                    <td>Rp {harga.toLocaleString() || "-"}</td>
+                    <td>Rp {finalPrice.toLocaleString()}</td>
+                </tr>
+            );
+        })}
+</tbody>
+
                 </table>
             </div>
         </div>

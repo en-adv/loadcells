@@ -6,5 +6,4 @@ const messageSchema = new mongoose.Schema({
     senderRole: String
 });
 
-const Message = mongoose.model("Message", messageSchema);
-export default Message; // ✅ Use export default
+export default mongoose.model("Message", messageSchema);

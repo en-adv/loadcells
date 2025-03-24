@@ -27,7 +27,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
             try {
                 const decoded = jwtDecode(token);
                 setUsername(decoded.username);
-                setRole(decoded.role);  // ✅ Support for operator1, operator2, etc.
+                setRole(decoded.role); 
             } catch (error) {
                 setUsername("");
                 setRole("");
@@ -40,23 +40,27 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
         window.location.href = "/";
     };
 
-    const menuItems = [
-        { text: "Dashboard", icon: <DashboardIcon />, route: role.startsWith("operator") ? `/${role}` : "/admin" }
-    ];
+    const isOperator = ["Sigalagala", "Hapung", "Paranjulu", "Binanga", "Portibi"].includes(role);
 
-    if (role.startsWith("operator")) {
-        menuItems.push({ text: "Ganti Potongan Harga", icon: <BarChartIcon />, route: `/${role}/diskon` });
-        menuItems.push({ text: "Pesan", icon: <ChatIcon />, route: `/${role}/readmessages` });
+const menuItems = [
+    { text: "Dashboard", icon: <DashboardIcon />, route: isOperator ? `/${role}` : "/admin" }
+];
 
-    }
+if (isOperator) {
+    menuItems.push(
+        { text: "Ganti Potongan Harga", icon: <BarChartIcon />, route: `/${role}/diskon` },
+        { text: "Pesan", icon: <ChatIcon />, route: `/${role}/readmessages` }
+    );
+}
 
-    if (role === "admin") {
-        menuItems.push(
-            { text: "Grafik", icon: <BarChartIcon />, route: "/admin/grafik" },
-            { text: "Download", icon: <CloudDownloadIcon />, route: "/admin/download" },
-            { text: "Pesan", icon: <ChatIcon/>, route: "/admin/messages" }
-        );
-    }
+if (role === "admin") {
+    menuItems.push(
+        { text: "Grafik", icon: <BarChartIcon />, route: "/admin/grafik" },
+        { text: "Download", icon: <CloudDownloadIcon />, route: "/admin/download" },
+        { text: "Pesan", icon: <ChatIcon />, route: "/admin/messages" }
+    );
+}
+
 
     const drawerContent = (
         <div>

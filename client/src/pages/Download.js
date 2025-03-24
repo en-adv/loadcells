@@ -3,7 +3,7 @@ import { Button, Typography } from "@mui/material";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-
+const API_URL = process.env.REACT_APP_API_URL;
 const Download = () => {
     const [tableData, setTableData] = useState([]);
 
@@ -11,7 +11,7 @@ const Download = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/vehicles"); // Adjust API if needed
+                const response = await axios.get(`${API_URL}/api/vehicles`); // Adjust API if needed
                 const filteredData = response.data.map(({ _id, __v, ...rest }) => rest); // Remove _id and __v
                 setTableData(filteredData);
             } catch (error) {
