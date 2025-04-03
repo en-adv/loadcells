@@ -21,18 +21,33 @@ router.post("/", async (req, res) => {
         console.log("Received request body:", req.body);
 
         const { plateNumber, weight, type, pricePerKg, discount, operator } = req.body;
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // One hour ago
 
-        let vehicle = await Vehicle.findOne({ plateNumber });
+        // Find the latest entry for the same plate number
+        let vehicle = await Vehicle.findOne({ plateNumber }).sort({ date: -1 });
 
         if (vehicle) {
+            const lastEntryTime = new Date(vehicle.date);
+
             if (type === "Bruto") {
+                // Prevent updating Bruto if the last entry is within one hour
+                if (lastEntryTime >= oneHourAgo) {
+                    return res.status(400).json({ message: "Cannot update Bruto within one hour of the last entry." });
+                }
                 vehicle.bruto = weight;
             } else if (type === "Tar") {
-                vehicle.tar = weight;
+                // Allow Tar update within one hour ONLY if Bruto exists but Tar is missing
+                if (!vehicle.tar) {
+                    vehicle.tar = weight;
+                } else {
+                    return res.status(400).json({ message: "Duplicate entry: Tar already exists." });
+                }
+            } else {
+                return res.status(400).json({ message: "Invalid type. Use 'Bruto' or 'Tar'." });
             }
-            vehicle.discount = discount;
-            vehicle.date = new Date(); // ✅ Update date whenever a record is modified
         } else {
+            // Create a new entry if no record exists
             vehicle = new Vehicle({
                 plateNumber,
                 bruto: type === "Bruto" ? weight : null,
@@ -40,18 +55,20 @@ router.post("/", async (req, res) => {
                 pricePerKg,
                 discount,
                 operator,
-                date: new Date() // ✅ Ensure new records get a timestamp
+                date: now
             });
         }
 
+        // Calculate Netto if both values exist
         const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
         vehicle.netto = netto;
 
+        // Calculate final price with discount
         const totalPrice = netto * pricePerKg;
         const discountAmount = (totalPrice * discount) / 100;
-        const finalPrice = totalPrice - discountAmount;
+        vehicle.totalPrice = totalPrice - discountAmount;
 
-        vehicle.totalPrice = finalPrice;
+        // Save to database
         await vehicle.save();
 
         res.json({ message: "Vehicle saved successfully", vehicle });
@@ -61,24 +78,6 @@ router.post("/", async (req, res) => {
     }
 });
 
-// ✅ Update a vehicle by ID
-router.put("/:id", async (req, res) => {
-    try {
-        const { plateNumber, bruto, tar, pricePerKg, discount } = req.body;
-        const netto = bruto - tar;
-        const totalPrice = netto * pricePerKg * ((100 - discount) / 100); // Apply discount
-
-        const updatedVehicle = await Vehicle.findByIdAndUpdate(
-            req.params.id,
-            { plateNumber, bruto, tar, pricePerKg, discount, totalPrice },
-            { new: true }
-        );
-
-        res.json(updatedVehicle);
-    } catch (err) {
-        res.status(500).json({ error: "Failed to update vehicle" });
-    }
-});
 
 // ✅ Delete a vehicle by ID
 router.delete("/:id", async (req, res) => {

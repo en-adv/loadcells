@@ -12,6 +12,11 @@ body {
     color: #2D336B;
 
 }
+.card:hover {
+  transform: scale(1.05);
+  transition: transform 0.3s ease-in-out;
+}
+
 
 .kirim-button {
     background-color:#2D336B; /* Green */
@@ -82,4 +87,13 @@ body {
   .custom-table tbody tr:nth-child(even) {
     background-color: #f9f9f9;
   }
-  
+  .custom-table th {
+    background-color: #2D336B;
+    color: white;
+    text-align: center;
+}
+
+.custom-table td {
+    vertical-align: middle;
+    text-align: center;
+}

@@ -20,7 +20,7 @@ const OperatorDashboard5 = () => {
 
     // Fetch Load Cell Data from Firebase
     useEffect(() => {
-        const loadCellRef = ref(db, "timbangan/Portibi/berat");
+        const loadCellRef = ref(db, "Portibi/berat");
         onValue(loadCellRef, (snapshot) => {
             if (snapshot.exists()) {
                 setLoadCell(snapshot.val());
@@ -61,29 +61,108 @@ const OperatorDashboard5 = () => {
     }, []);
 
     useEffect(() => {
-        const operator = "Portibi"; // Ensure this is dynamically set later
-        const total = vehicles
-            .filter(vehicle => vehicle.operator === operator)
-            .reduce((sum, vehicle) => sum + (vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0), 0);
+        const operator = "Portibi"; // Adjust dynamically if needed
+        const today = new Date().toISOString().split("T")[0]; // Get today's date in YYYY-MM-DD format
     
-        setTotalNetto(total);
+        axios.get(`${API_URL}/api/vehicles`)
+            .then((res) => {
+                // Filter data to only include today's records
+                const todaysVehicles = res.data.filter(vehicle => 
+                    vehicle.operator === operator &&
+                    vehicle.date &&
+                    new Date(vehicle.date).toISOString().split("T")[0] === today
+                );
     
-        const lastThreshold = parseInt(localStorage.getItem("lastThreshold") || "0", 10);
-        const nextThreshold = Math.floor(total / 10000) * 10000; // Fix threshold logic
+                // Calculate today's total netto
+                const todayTotal = todaysVehicles.reduce(
+                    (sum, vehicle) => sum + (vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0),
+                    0
+                );
     
+                setTotalNetto(todayTotal);
     
-        if (total >= nextThreshold && nextThreshold > lastThreshold) {
-            console.log("🎉 Showing notification!");
-            setShowNotification(true);
-            localStorage.setItem("lastThreshold", nextThreshold.toString());
-        }
-    }, [vehicles]);
+                // Fetch last threshold from DB
+                axios.get(`${API_URL}/api/threshold/${operator}`)
+                    .then((thresholdRes) => {
+                        const lastThreshold = thresholdRes.data?.lastThreshold || 0;
+                        let nextThreshold = Math.floor(todayTotal / 10000) * 10000;
+    
+                        if (todayTotal >= nextThreshold && nextThreshold > lastThreshold) {
+                            console.log("🎉 Showing notification!");
+                            setShowNotification(true);
+    
+                            // Update threshold in the database
+                            axios.post(`${API_URL}/api/threshold`, { operator, lastThreshold: nextThreshold })
+                                .catch(err => console.error("Error updating threshold:", err));
+                        }
+                    })
+                    .catch(err => console.error("Error fetching threshold:", err));
+            })
+            .catch(err => console.error("Error fetching vehicles:", err));
+    }, [vehicles]); // Runs when vehicles update
+    
     
 
     const handleNotificationDismiss = () => {
         setShowNotification(false);
     };
     
+    const handlePrint = async (vehicle) => {
+        try {
+            // 1. Request a Bluetooth Device
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"], // ESC/POS UUID
+            });
+    
+            // 2. Connect to Bluetooth Device
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
+            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
+            const total = (vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100) * vehicle.pricePerKg ;
+            // 3. Generate Invoice Text with Proper ESC/POS Formatting
+            const ESC = "\x1B"; // ESC POS Command
+            const CENTER = ESC + "\x61\x01"; // Center Text
+            const LEFT = ESC + "\x61\x00"; // Left Align Text
+            const BOLD_ON = ESC + "\x45\x01"; // Bold Text On
+            const BOLD_OFF = ESC + "\x45\x00"; // Bold Text Off
+            const LINE_FEED = "\n"; // New Line
+            const SEPARATOR = "============================\n"; // Separator Line
+    
+            const invoiceText =
+                LINE_FEED +
+                CENTER + BOLD_ON + "Slip Timbangan TBS\n" + BOLD_OFF +
+                CENTER + BOLD_ON + " * Sawit Makmur *\n" + BOLD_OFF +
+                SEPARATOR +
+                CENTER + BOLD_ON + "Portibi\n" + BOLD_OFF +
+                LINE_FEED +
+                LEFT + `Tanggal   : ${new Date(vehicle.date).toLocaleString("id-ID")}\n` +
+                `No Polisi    : ${vehicle.plateNumber}\n` +
+                `Bruto        : ${vehicle.bruto} Kg\n` +
+                `Tarra        : ${vehicle.tar} Kg\n` +
+                `Netto        : ${vehicle.bruto - vehicle.tar} Kg\n` +
+                `Potongan     : ${vehicle.discount}%\n` +
+                `Harga/Kg     : Rp ${vehicle.pricePerKg.toLocaleString()}\n` +
+                `Netto Bersih : ${vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100} Kg\n` +
+                LINE_FEED +
+                `Total        : Rp ${total.toLocaleString()}\n` +
+                LINE_FEED +
+                SEPARATOR +
+                CENTER + "Terima Kasih!\n" +
+                SEPARATOR +
+                LINE_FEED.repeat(3); // Feed paper after print
+    
+            // 4. Encode and Send Data to Printer
+            let encoder = new TextEncoder();
+            let data = encoder.encode(invoiceText);
+            await characteristic.writeValue(data);
+    
+            alert("Nota Terkirim ke Printer ✅");
+        } catch (error) {
+            console.error("Bluetooth Print Error: ", error);
+            alert("Gagal Mencetak Nota ❌");
+        }
+    };
     
     // Submit Weight Data
     const handleSubmit = () => {
@@ -260,6 +339,11 @@ const OperatorDashboard5 = () => {
                     <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
                     <td>Rp {harga.toLocaleString() || "-"}</td>
                     <td>Rp {finalPrice.toLocaleString()}</td>
+                    <td>
+                        <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>
+                            Print Nota 🖨️
+                        </button>
+                    </td>
                 </tr>
             );
         })}

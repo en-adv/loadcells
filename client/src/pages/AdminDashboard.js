@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, off } from "firebase/database";
 import { database } from "../firebaseConfig";
 import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
 
 jsPDF.API.autoTable = autoTable;
 
@@ -22,7 +23,6 @@ const AdminDashboard = () => {
     portibi: 0,
 });
 
-    const [plateNumber, setPlateNumber] = useState("");
     const [vehicles, setVehicles] = useState([]);
     const [search, setSearch] = useState("");
     const [pricePerKg, setPricePerKg] = useState(0);
@@ -30,57 +30,90 @@ const AdminDashboard = () => {
     const [editingVehicle, setEditingVehicle] = useState(null);
     const [selectedOperator, setSelectedOperator] = useState("");
     const uniqueOperators = [...new Set(vehicles.map((v) => v.operator))];
+    const [reloadData, setReloadData] = useState(false);
 
      // ✅ Fetch all timbangans from Firebase
      useEffect(() => {
         const locations = {
-            sigalaGala: "timbangan/Sigalagala/berat",
-            hapung: "timbangan/Hapung/berat",
-            paranjulu: "timbangan/Paranjulu/berat",
-            binanga: "timbangan/Binanga/berat",
-            portibi: "timbangan/Portibi/berat",
+            sigalaGala: "Sigalagala/berat",
+            hapung: "Hapung/berat",
+            paranjulu: "Paranjulu/berat",
+            binanga: "Binanga/berat",
+            portibi: "Portibi/berat",
         };
-
+    
+        // Simpan referensi listener
+        const listeners = {};
+    
         Object.keys(locations).forEach((key) => {
             const loadCellRef = ref(db, locations[key]);
-            onValue(loadCellRef, (snapshot) => {
+            
+            listeners[key] = onValue(loadCellRef, (snapshot) => {
                 if (snapshot.exists()) {
                     setLoadCells((prev) => ({ ...prev, [key]: snapshot.val() }));
                 }
             });
         });
+    
+        // Cleanup: Hapus semua listener saat komponen di-unmount
+        return () => {
+            Object.keys(listeners).forEach((key) => {
+                off(ref(db, locations[key])); // Hapus listener dari Firebase
+            });
+        };
     }, []);
+    
 
-    // Fetch Vehicle Data from MongoDB
-    useEffect(() => {
-        axios.get(`${API_URL}/api/vehicles`)
-            .then((res) => {
-                setVehicles(res.data);
-                calculateDailyIncome(res.data); // ✅ Calculate total income
-            })
-            .catch((err) => console.error("Error fetching vehicles:", err));
-    }, []);
+    
 
-    // Fetch Latest Price Data from MongoDB
-    useEffect(() => {
-        axios.get(`${API_URL}/api/price`)
-            .then((res) => {
-                if (res.data.length > 0) {
-                    setPricePerKg(res.data[0].price);
-                }
-            })
-            .catch((err) => console.error("Error fetching price:", err));
-    }, []);
+useEffect(() => {
+    axios.get(`${API_URL}/api/vehicles`)
+        .then((res) => {
+            setVehicles(res.data);
+            calculateDailyIncome(res.data);
+        })
+        .catch((err) => console.error("Error fetching vehicles:", err));
+}, [reloadData]); // ✅ Refetch when reloadData changes
 
-    // Function to calculate total income for the day
-    const calculateDailyIncome = (vehicles) => {
-        const today = new Date().toISOString().split("T")[0]; // Get today's date (YYYY-MM-DD)
-        const dailyTotal = vehicles
-            .filter(vehicle => new Date(vehicle.date).toISOString().split("T")[0] === today) // ✅ Filter today's records
-            .reduce((sum, vehicle) => sum + (vehicle.totalPrice || 0), 0); // ✅ Sum up totalPrice
-        
-        setTotalIncome(dailyTotal);
-    };
+useEffect(() => {
+    axios.get(`${API_URL}/api/price`)
+        .then((res) => {
+            if (res.data.length > 0) {
+                setPricePerKg(res.data[0].price);
+            }
+        })
+        .catch((err) => console.error("Error fetching price:", err));
+}, [reloadData]); // ✅ Refetch price data when changed
+
+useEffect(() => {
+    const interval = setInterval(() => {
+        setReloadData(prev => !prev);
+    }, 10000); // Refresh setiap 1 menit
+
+    return () => clearInterval(interval); // Hapus interval saat komponen unmount
+}, []);
+
+    const [totalNetto, setTotalNetto] = useState(0); // New state for total netto
+
+const calculateDailyIncome = (vehicles) => {
+    const today = new Date().toISOString().split("T")[0];
+
+    let dailyTotal = 0;
+    let dailyNetto = 0;
+
+    vehicles.forEach(vehicle => {
+        if (new Date(vehicle.date).toISOString().split("T")[0] === today) {
+            dailyTotal += vehicle.totalPrice || 0;
+            if (vehicle.bruto && vehicle.tar) {
+                dailyNetto += vehicle.bruto - vehicle.tar;
+            }
+        }
+    });
+
+    setTotalIncome(dailyTotal);
+    setTotalNetto(dailyNetto);
+};
+
 
     const handlePriceUpdate = () => {
         axios.post(`${API_URL}/api/price`, { 
@@ -120,13 +153,14 @@ const AdminDashboard = () => {
         
         // Daftar lokasi dalam urutan yang diinginkan
         const locationOrder = ["Hapung", "Paranjulu", "Portibi", "Binanga", "Sigalagala"];
-    
+       
         // Filter dan urutkan data berdasarkan lokasi
         const sortedVehicles = vehicles
             .filter(vehicle => locationOrder.includes(vehicle.operator))
             .sort((a, b) => locationOrder.indexOf(a.operator) - locationOrder.indexOf(b.operator));
     
         // Attach autoTable explicitly with smaller font size
+        doc.text("Laporan Timbangan Sawit", 14, 10);
         autoTable(doc, {
             head: [["Tanggal", "No Polisi", "Brutto", "Tar", "Netto", "Potongan", "Harga/Kg", "Netto x Harga", "Total", "Lokasi"]],
             
@@ -155,7 +189,12 @@ const AdminDashboard = () => {
                 fontSize: 8, 
             }
         });
-    
+    // ✅ Add page numbers
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.text(`Page ${i} of ${totalPages}`, 180, 290);
+    }
         doc.save("Laporan_Timbangan_Sawit.pdf");
     };
     
@@ -190,29 +229,33 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                {/* ✅ Total Pendapatan Hari Ini */}
                 <div className="row justify-content-center">
-        <div className="col-md-6">
-            <div className="card text-center bg-success text-white">
-                <div className="card-body">
-                    <h5 className="card-title text-white">Total Pendapatan Hari Ini</h5>
-                    <h3>Rp {totalIncome.toLocaleString()}</h3>
-                </div>
+    <div className="col-md-6">
+        <div className="card text-center bg-success text-white">
+            <div className="card-body">
+                <h5 className="card-title text-white">Total Pembayaran Hari Ini</h5>
+                <h3>Rp {totalIncome.toLocaleString()}</h3>
+                <h5 className="mt-2">Total Netto Hari Ini: {totalNetto.toLocaleString()} Kg</h5>
             </div>
         </div>
     </div>
+</div>
+
             </div>
 
             {/* Editable Price Input */}
             <h5 className="mt-3">Update Harga per kg</h5>
             <div className="input-group mb-3">
-                <input
-                    type="number"
+            <input
+                    type="text"
                     className="form-control"
-                    value={pricePerKg}
-                    onChange={(e) => setPricePerKg(e.target.value)}
-                    min="0"
+                    value={pricePerKg.toLocaleString()}
+                    onChange={(e) => {
+                        const cleanValue = e.target.value.replace(/,/g, ""); // Remove commas
+                        setPricePerKg(cleanValue ? parseInt(cleanValue, 10) : 0);
+                    }}
                 />
+
                 <button className="btn btn-primary " onClick={handlePriceUpdate}>
                     Ubah Harga
                 </button>
@@ -259,7 +302,7 @@ const AdminDashboard = () => {
                             <th>Netto</th>
                             <th>Potongan</th>
                             <th>Harga</th>
-                            <th>Netto x Harga</th>
+                            <th>Netto Bersih</th>
                             <th>Total</th>
                             <th>Lokasi</th>
 
