@@ -30,9 +30,14 @@ const OperatorDashboard3 = () => {
 
     // Fetch Vehicle Data from MongoDB
     useEffect(() => {
-        axios.get(`${API_URL}/api/vehicles`)
-            .then((res) => setVehicles(res.data))
-            .catch((err) => console.error("Error fetching vehicles:", err));
+        const operator = "Paranjulu"; // Sesuaikan atau ambil dari JWT
+        axios.get(`${API_URL}/api/price/${operator}`)   
+            .then((res) => {
+                if (res.data && res.data.price !== undefined) {
+                    setPricePerKg(res.data.price);
+                }
+            })
+            .catch((err) => console.error("Error fetching operator price:", err));
     }, []);
 
     // Fetch Price Data from MongoDB
@@ -118,16 +123,14 @@ const OperatorDashboard3 = () => {
             // 2. Connect to Bluetooth Device
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
-            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
-            const total = (vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100) * vehicle.pricePerKg ;
-            // 3. Generate Invoice Text with Proper ESC/POS Formatting
+            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");// 3. Generate Invoice Text with Proper ESC/POS Formatting
             const ESC = "\x1B"; // ESC POS Command
             const CENTER = ESC + "\x61\x01"; // Center Text
             const LEFT = ESC + "\x61\x00"; // Left Align Text
             const BOLD_ON = ESC + "\x45\x01"; // Bold Text On
             const BOLD_OFF = ESC + "\x45\x00"; // Bold Text Off
             const LINE_FEED = "\n"; // New Line
-            const SEPARATOR = "============================\n"; // Separator Line
+            const SEPARATOR = "================================\n"; // Separator Line
     
             const invoiceText =
                 LINE_FEED +
@@ -143,11 +146,12 @@ const OperatorDashboard3 = () => {
                 `Netto        : ${vehicle.bruto - vehicle.tar} Kg\n` +
                 `Potongan     : ${vehicle.discount}%\n` +
                 `Harga/Kg     : Rp ${vehicle.pricePerKg.toLocaleString()}\n` +
-                `Netto Bersih : ${vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100} Kg\n` +
+                `Netto Bersih : ${vehicle.nettobersih.toLocaleString()} Kg\n` +
                 LINE_FEED +
-                `Total        : Rp ${total.toLocaleString()}\n` +
+                `Total        : Rp ${vehicle.totalPrice.toLocaleString()}\n` +
                 LINE_FEED +
                 SEPARATOR +
+                CENTER + "NB: Tidak Menerima Buah Curian !\n" +
                 CENTER + "Terima Kasih!\n" +
                 SEPARATOR +
                 LINE_FEED.repeat(3); // Feed paper after print
@@ -170,7 +174,9 @@ const OperatorDashboard3 = () => {
             alert("Masukkan Nomor Kendaraan");
             return;
         }
-    
+        const netto = vehicles.netto ;
+        const potonganNetto = (netto * discount) / 100;
+        const nettobersih = Math.round(netto - potonganNetto);
         const operator = "Paranjulu";  // ✅ Replace this with actual logged-in operator
     
         const payload = {
@@ -178,6 +184,7 @@ const OperatorDashboard3 = () => {
             weight: loadCell,
             type: selectedType,
             pricePerKg,
+            nettobersih,
             discount,
             operator,
         };
@@ -294,14 +301,14 @@ const OperatorDashboard3 = () => {
                  <table className="table custom-table">
                <thead className="custom-thead">    
                         <tr>
-                            <th>Tanggal</th>
+                        <th>Tanggal</th>
                             <th>Nomor Polisi</th>
                             <th>Brutto</th>
                             <th>Tarra</th>
                             <th>Netto</th>
                             <th>Potongan (%)</th>       
                             <th>Harga/Kg</th>
-                            <th>Netto x Harga</th>
+                            <th>Netto Bersih</th>
                             <th>Total </th>
                         </tr>
                     </thead>
@@ -311,12 +318,8 @@ const OperatorDashboard3 = () => {
         .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
         .map((vehicle, index) => {
             const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-            const totalPrice = netto * pricePerKg;
-            const discountAmount = (totalPrice * discount) / 100;
-            const finalPrice = totalPrice - discountAmount;
-            const harga = netto * vehicle.pricePerKg;
+            const finalPrice = vehicle.nettobersih * pricePerKg;
 
-            // ✅ Extract and Format the Date
             const formattedDate = vehicle.date
                 ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
                     day: "2-digit", 
@@ -324,7 +327,7 @@ const OperatorDashboard3 = () => {
                     year: "numeric", 
                     hour: "2-digit", 
                     minute: "2-digit", 
-                    second: "2-digit" 
+                    second: "2-digit"
                   }) 
                 : "-";
 
@@ -337,7 +340,7 @@ const OperatorDashboard3 = () => {
                     <td>{netto || "-"} Kg</td> 
                     <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
                     <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
-                    <td>Rp {harga.toLocaleString() || "-"}</td>
+                    <td>{vehicle.nettobersih || "-"} Kg</td>
                     <td>Rp {finalPrice.toLocaleString()}</td>
                     <td>
                         <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>

@@ -2,13 +2,14 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Container, TextField, Button, Typography, Card, CardContent, Box } from "@mui/material";
+
 const API_URL = process.env.REACT_APP_API_URL;
+
 const Login = ({ setAuth }) => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const navigate = useNavigate();
-    
     
     const handleLogin = async () => {
         try {
@@ -16,10 +17,13 @@ const Login = ({ setAuth }) => {
             localStorage.setItem("token", res.data.token);
             localStorage.setItem("role", res.data.role);
             
-
+            // Tambahkan waktu expired (misalnya 1 jam dari sekarang)
+            const expiry = Date.now() + 60 * 60 * 1000;
+            localStorage.setItem("expiry", expiry);
+    
             setAuth(res.data.role);
-
-            // Redirect based on role
+    
+            // Redirect sesuai role
             switch (res.data.role) {
                 case "admin":
                     navigate("/admin");
@@ -39,6 +43,9 @@ const Login = ({ setAuth }) => {
                 case "Portibi":
                     navigate("/Portibi");
                     break;
+                case "Pabrik":
+                    navigate("/pabrik");
+                    break;
                 default:
                     navigate("/login");
             }
@@ -46,6 +53,7 @@ const Login = ({ setAuth }) => {
             setError("Invalid Credentials");
         }
     };
+    
 
     return (
         <Container maxWidth="sm">
@@ -53,7 +61,7 @@ const Login = ({ setAuth }) => {
                 <Card sx={{ padding: 3, width: "100%", maxWidth: 400, boxShadow: 3 }}>
                     <CardContent>
                         <Typography variant="h5" align="center" gutterBottom>
-                            Login
+                            Sawit Makmur
                         </Typography>
                         <TextField
                             fullWidth

@@ -37,13 +37,14 @@ const OperatorDashboard5 = () => {
 
     // Fetch Price Data from MongoDB
     useEffect(() => {
-        axios.get(`${API_URL}/api/price`)
+        const operator = "Portibi"; // Sesuaikan atau ambil dari JWT
+        axios.get(`${API_URL}/api/price/${operator}`)   
             .then((res) => {
-                if (res.data.length > 0) {
-                    setPricePerKg(res.data[0].price);
+                if (res.data && res.data.price !== undefined) {
+                    setPricePerKg(res.data.price);
                 }
             })
-            .catch((err) => console.error("Error fetching price:", err));
+            .catch((err) => console.error("Error fetching operator price:", err));
     }, []);
 
     useEffect(() => {
@@ -119,7 +120,6 @@ const OperatorDashboard5 = () => {
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
             const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
-            const total = (vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100) * vehicle.pricePerKg ;
             // 3. Generate Invoice Text with Proper ESC/POS Formatting
             const ESC = "\x1B"; // ESC POS Command
             const CENTER = ESC + "\x61\x01"; // Center Text
@@ -127,7 +127,7 @@ const OperatorDashboard5 = () => {
             const BOLD_ON = ESC + "\x45\x01"; // Bold Text On
             const BOLD_OFF = ESC + "\x45\x00"; // Bold Text Off
             const LINE_FEED = "\n"; // New Line
-            const SEPARATOR = "============================\n"; // Separator Line
+            const SEPARATOR = "================================\n"; // Separator Line
     
             const invoiceText =
                 LINE_FEED +
@@ -136,18 +136,19 @@ const OperatorDashboard5 = () => {
                 SEPARATOR +
                 CENTER + BOLD_ON + "Portibi\n" + BOLD_OFF +
                 LINE_FEED +
-                LEFT + `Tanggal   : ${new Date(vehicle.date).toLocaleString("id-ID")}\n` +
+                LEFT + `Tanggal, jam: ${new Date(vehicle.date).toLocaleString("id-ID")}\n` +
                 `No Polisi    : ${vehicle.plateNumber}\n` +
                 `Bruto        : ${vehicle.bruto} Kg\n` +
                 `Tarra        : ${vehicle.tar} Kg\n` +
                 `Netto        : ${vehicle.bruto - vehicle.tar} Kg\n` +
                 `Potongan     : ${vehicle.discount}%\n` +
                 `Harga/Kg     : Rp ${vehicle.pricePerKg.toLocaleString()}\n` +
-                `Netto Bersih : ${vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100} Kg\n` +
+                `Netto Bersih : ${vehicle.nettobersih.toLocaleString()} Kg\n` +
                 LINE_FEED +
-                `Total        : Rp ${total.toLocaleString()}\n` +
+                `Total        : Rp ${vehicle.totalPrice.toLocaleString()}\n` +
                 LINE_FEED +
                 SEPARATOR +
+                CENTER + "NB: Tidak Menerima Buah Curian !\n" +
                 CENTER + "Terima Kasih!\n" +
                 SEPARATOR +
                 LINE_FEED.repeat(3); // Feed paper after print
@@ -170,6 +171,9 @@ const OperatorDashboard5 = () => {
             alert("Masukkan Nomor Kendaraan");
             return;
         }
+        const netto = vehicles.netto ;
+        const potonganNetto = (netto * discount) / 100;
+        const nettobersih = Math.round(netto - potonganNetto);
     
         const operator = "Portibi";  // ✅ Replace this with actual logged-in operator
     
@@ -179,6 +183,7 @@ const OperatorDashboard5 = () => {
             type: selectedType,
             pricePerKg,
             discount,
+            nettobersih,
             operator,
         };
     
@@ -294,14 +299,14 @@ const OperatorDashboard5 = () => {
                  <table className="table custom-table">
                <thead className="custom-thead">    
                         <tr>
-                            <th>Tanggal</th>
+                        <th>Tanggal</th>
                             <th>Nomor Polisi</th>
                             <th>Brutto</th>
                             <th>Tarra</th>
                             <th>Netto</th>
                             <th>Potongan (%)</th>       
                             <th>Harga/Kg</th>
-                            <th>Netto x Harga</th>
+                            <th>Netto Bersih</th>
                             <th>Total </th>
                         </tr>
                     </thead>
@@ -311,12 +316,9 @@ const OperatorDashboard5 = () => {
         .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
         .map((vehicle, index) => {
             const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-            const totalPrice = netto * pricePerKg;
-            const discountAmount = (totalPrice * discount) / 100;
-            const finalPrice = totalPrice - discountAmount;
-            const harga = netto * vehicle.pricePerKg;
+            const finalPrice = vehicle.nettobersih * pricePerKg;
+            
 
-            // ✅ Extract and Format the Date
             const formattedDate = vehicle.date
                 ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
                     day: "2-digit", 
@@ -324,7 +326,7 @@ const OperatorDashboard5 = () => {
                     year: "numeric", 
                     hour: "2-digit", 
                     minute: "2-digit", 
-                    second: "2-digit" 
+                    second: "2-digit"
                   }) 
                 : "-";
 
@@ -337,7 +339,7 @@ const OperatorDashboard5 = () => {
                     <td>{netto || "-"} Kg</td> 
                     <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
                     <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
-                    <td>Rp {harga.toLocaleString() || "-"}</td>
+                    <td>{vehicle.nettobersih || "-"} Kg</td>
                     <td>Rp {finalPrice.toLocaleString()}</td>
                     <td>
                         <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>

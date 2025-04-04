@@ -1,42 +1,41 @@
-import express from 'express';
-import Price from '../models/Price.js'; 
+import express from "express";
+import Price from "../models/Price.js";
 
 const router = express.Router();
 
-// Get Latest Price
-router.get("/", async (req, res) => {
+// Ambil harga terbaru berdasarkan operator
+router.get("/:operator", async (req, res) => {
     try {
-        const latestPrice = await Price.find().sort({ _id: -1 }).limit(1);
-        res.json(latestPrice);
+        const { operator } = req.params;
+        const priceEntry = await Price.findOne({ operator }).sort({ _id: -1 })
+        ;
+
+        if (!priceEntry) return res.status(404).json({ message: "No price found" });
+
+        res.json(priceEntry);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching price", error });
+        res.status(500).json({ error: "Server error" });
     }
 });
 
-router.get("/history", async (req, res) => {
-    try {
-        const allPrices = await Price.find().sort({ date: 1 }); // Oldest to Newest
-        res.json(allPrices);
-    } catch (error) {
-        res.status(500).json({ message: "Error fetching price history", error });
-    }
-});
-
-// Add a New Price Entry (Do NOT update, just add)
+// Update harga tanpa authMiddleware
 router.post("/", async (req, res) => {
     try {
-        const { price } = req.body;
+        const { operator, price, role } = req.body;
 
-        // Always create a new price entry
-        const newPrice = new Price({
-            date: new Date(),
-            price
-        });
+        // Cek apakah user boleh mengubah harga
+        const restrictedOperators = ["Binanga", "Paranjulu", "Portibi"];
+        if (restrictedOperators.includes(operator) && role !== "admin") {
+            return res.status(403).json({ error: "Unauthorized. Only admin can update this price." });
+        }
 
+        // Simpan harga ke database
+        const newPrice = new Price({ operator, price });
         await newPrice.save();
-        res.status(201).json({ message: "New price added successfully", newPrice });
+
+        res.json({ message: "Price updated successfully", newPrice });
     } catch (error) {
-        res.status(500).json({ message: "Error saving price", error });
+        res.status(500).json({ error: "Server error" });
     }
 });
 

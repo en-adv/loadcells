@@ -9,10 +9,12 @@ import OperatorDashboard2 from "./pages/OperatorDashboard2";
 import OperatorDashboard3 from "./pages/OperatorDashboard3";
 import OperatorDashboard4 from "./pages/OperatorDashboard4";
 import OperatorDashboard5 from "./pages/OperatorDashboard5";
+import PabrikDashboard from "./pages/PabrikDashboard";
 import Grafik from "./pages/Grafik";
 import Download from "./pages/Download";
 import ChatPage from "./pages/ChatPage";
 import Diskon from "./pages/OperatorDiscount";
+import UpdatePrice from "./pages/UpdatePrice";
 import ReadMessagesPage from "./pages/ReadMessagesPage";
 import "bootstrap/dist/css/bootstrap.min.css";
 
@@ -21,15 +23,34 @@ const App = () => {
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        if (token) {
-            try {
-                const decoded = jwtDecode(token);
-                setAuth(decoded.role); // ✅ Store the role from JWT
-            } catch (error) {
+        const expiry = localStorage.getItem("expiry");
+    
+        if (token && expiry) {
+            const now = Date.now();
+    
+            if (now >= parseInt(expiry)) {
+                // Token kadaluarsa, bersihkan
+                localStorage.removeItem("token");
+                localStorage.removeItem("role");
+                localStorage.removeItem("expiry");
                 setAuth(null);
+            } else {
+                try {
+                    const decoded = jwtDecode(token);
+                    setAuth(decoded.role); // Valid, simpan role
+                } catch (error) {
+                    // Token invalid
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("role");
+                    localStorage.removeItem("expiry");
+                    setAuth(null);
+                }
             }
+        } else {
+            setAuth(null); // Tidak ada token
         }
     }, []);
+    
 
     return (
         <Router>
@@ -60,6 +81,7 @@ const App = () => {
                         <Route path="download" element={<Download />} />
                         <Route path="messages" element={<ChatPage />} />
                         <Route path="Readmessages" element={<ReadMessagesPage />} />
+                        <Route path="update-price" element={<UpdatePrice />} />
 
                     </Route>
                 )}
@@ -70,6 +92,7 @@ const App = () => {
                         <Route index element={<OperatorDashboard1 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
+                        <Route path="update-price" element={<UpdatePrice operator="Sigalagala" />} />
                     </Route>
                 )}
 
@@ -78,6 +101,7 @@ const App = () => {
                         <Route index element={<OperatorDashboard2 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
+                        <Route path="update-price" element={<UpdatePrice operator="Hapung" />} />
                     </Route>
                 )}
 
@@ -103,6 +127,11 @@ const App = () => {
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
                     </Route>
+                )}
+
+                {/* 🔹 Pabrik Route */}
+                {auth === "Pabrik" && (
+                    <Route path="/pabrik" element={<PabrikDashboard />} /> // 🔹 Hanya akses Dashboard Pabrik
                 )}
             </Routes>
         </Router>

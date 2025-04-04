@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 
-
 const PriceSchema = new mongoose.Schema({
-    date: { type: String, required: true }, // e.g., "15-3-2025"
-    price: { type: Number, required: true } // e.g., 3500
+    date: { type: Date, default: Date.now }, // ⏰ Gunakan tipe Date
+    price: { type: Number, required: true },
+    operator: { type: String, required: true } 
 });
-export default mongoose.model('price', PriceSchema);
+
+export default mongoose.model("Price", PriceSchema);

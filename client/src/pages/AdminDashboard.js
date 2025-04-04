@@ -22,6 +22,13 @@ const AdminDashboard = () => {
     binanga: 0,
     portibi: 0,
 });
+const [prices, setPrices] = useState({
+    Sigalagala: 0,
+    Hapung: 0,
+    Paranjulu: 0,
+    Binanga: 0,
+    Portibi: 0
+});
 
     const [vehicles, setVehicles] = useState([]);
     const [search, setSearch] = useState("");
@@ -64,8 +71,6 @@ const AdminDashboard = () => {
     }, []);
     
 
-    
-
 useEffect(() => {
     axios.get(`${API_URL}/api/vehicles`)
         .then((res) => {
@@ -76,14 +81,29 @@ useEffect(() => {
 }, [reloadData]); // ✅ Refetch when reloadData changes
 
 useEffect(() => {
-    axios.get(`${API_URL}/api/price`)
-        .then((res) => {
-            if (res.data.length > 0) {
-                setPricePerKg(res.data[0].price);
-            }
-        })
-        .catch((err) => console.error("Error fetching price:", err));
-}, [reloadData]); // ✅ Refetch price data when changed
+    const operators = ["Sigalagala", "Hapung", "Paranjulu", "Binanga", "Portibi"];
+
+    Promise.all(
+        operators.map(op =>
+            axios.get(`${API_URL}/api/price/${op}`)
+                .then(res => {
+                    const price = Array.isArray(res.data)
+                        ? (res.data[0]?.price || 0)
+                        : (res.data?.price || 0);
+                    return { [op]: price };
+                })
+                .catch(err => {
+                    console.error(`Error fetching price for ${op}:`, err);
+                    return { [op]: 0 };
+                })
+        )
+    ).then(results => {
+        const newPrices = results.reduce((acc, item) => ({ ...acc, ...item }), {});
+        setPrices(newPrices);
+    });
+}, [reloadData]);
+
+
 
 useEffect(() => {
     const interval = setInterval(() => {
@@ -105,7 +125,7 @@ const calculateDailyIncome = (vehicles) => {
         if (new Date(vehicle.date).toISOString().split("T")[0] === today) {
             dailyTotal += vehicle.totalPrice || 0;
             if (vehicle.bruto && vehicle.tar) {
-                dailyNetto += vehicle.bruto - vehicle.tar;
+                dailyNetto += vehicle.nettobersih;
             }
         }
     });
@@ -115,14 +135,7 @@ const calculateDailyIncome = (vehicles) => {
 };
 
 
-    const handlePriceUpdate = () => {
-        axios.post(`${API_URL}/api/price`, { 
-            price: Number(pricePerKg), 
-            date: new Date().toISOString()  // ✅ Store timestamp correctly
-        }) 
-        .then(() => alert("Harga baru telah disimpan!"))
-        .catch(err => console.error("Error saving new price:", err));
-    };
+   
 
     const handleEdit = (vehicle) => {
         setEditingVehicle(vehicle);
@@ -148,6 +161,18 @@ const calculateDailyIncome = (vehicles) => {
                 .catch((err) => console.error("Error deleting vehicle:", err));
         }
     };
+
+    const handleClearAll = () => {
+        if (window.confirm("Apakah Anda yakin ingin menghapus SEMUA data kendaraan?")) {
+            axios.delete(`${API_URL}/api/vehicles`)
+                .then(() => {
+                    alert("Semua data kendaraan berhasil dihapus!");
+                    setVehicles([]); // Kosongkan state setelah penghapusan
+                })
+                .catch((err) => console.error("Error clearing data:", err));
+        }
+    };
+     
     const downloadPDF = () => {
         const doc = new jsPDF();
         
@@ -206,34 +231,30 @@ const calculateDailyIncome = (vehicles) => {
 
            {/* ✅ Cards Section for all timbangans */}
            <div className="row">
-                {Object.entries(loadCells).map(([key, value]) => (
-                    <div className="col-md-4 mb-3" key={key}>
-                        <div className="card text-center">
+                    {Object.entries(loadCells).map(([key, value]) => {
+                        const location = key.charAt(0).toUpperCase() + key.slice(1); // Capitalize
+                        const harga = prices[location] || 0;
+
+                        return (
+                        <div className="col-md-4 mb-3" key={key}>
+                            <div className="card text-center">
                             <div className="card-body">
-                                <h5 className="card-title">
-                                    Timbangan {key.charAt(0).toUpperCase() + key.slice(1)}
-                                </h5>
+                                <h5 className="card-title">Timbangan {location}</h5>
                                 <h3 className="text-primary">{value.toLocaleString()} kg</h3>
+                                <h6 className="text-success mt-2">Harga/kg: Rp {harga.toLocaleString()}</h6>
+                            </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                        );
+                    })}
 
-                {/* ✅ Harga per kg */}
-                <div className="col-md-4 mb-3">
-                    <div className="card text-center">
-                        <div className="card-body">
-                            <h5 className="card-title">Harga/kg</h5>
-                            <h3 className="text-success">Rp {pricePerKg.toLocaleString()}</h3>
-                        </div>
-                    </div>
-                </div>
+              
 
                 <div className="row justify-content-center">
     <div className="col-md-6">
         <div className="card text-center bg-success text-white">
             <div className="card-body">
-                <h5 className="card-title text-white">Total Pembayaran Hari Ini</h5>
+                <h5 className="card-title text-white">Total Pembelian Hari Ini</h5>
                 <h3>Rp {totalIncome.toLocaleString()}</h3>
                 <h5 className="mt-2">Total Netto Hari Ini: {totalNetto.toLocaleString()} Kg</h5>
             </div>
@@ -243,23 +264,7 @@ const calculateDailyIncome = (vehicles) => {
 
             </div>
 
-            {/* Editable Price Input */}
-            <h5 className="mt-3">Update Harga per kg</h5>
-            <div className="input-group mb-3">
-            <input
-                    type="text"
-                    className="form-control"
-                    value={pricePerKg.toLocaleString()}
-                    onChange={(e) => {
-                        const cleanValue = e.target.value.replace(/,/g, ""); // Remove commas
-                        setPricePerKg(cleanValue ? parseInt(cleanValue, 10) : 0);
-                    }}
-                />
-
-                <button className="btn btn-primary " onClick={handlePriceUpdate}>
-                    Ubah Harga
-                </button>
-            </div>
+            
 
             {/* Search Bar */}
             <div className="mt-3">
@@ -285,9 +290,15 @@ const calculateDailyIncome = (vehicles) => {
                 ))}
             </select>
         </div>
-        <button className="btn btn-danger mb-3" onClick={downloadPDF}>
+        <button className="btn btn-danger me-2 mb-3" onClick={downloadPDF}>
     📄 Download PDF
 </button>
+
+<button className="btn btn-danger mb-3" onClick={handleClearAll}>
+    ❌ Hapus Semua Data
+</button>
+
+
 
             {/* Vehicle Table */}
             <h4 className="mt-2">Kendaraan Terdaftar</h4>
@@ -316,7 +327,8 @@ const calculateDailyIncome = (vehicles) => {
         .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
         .map((vehicle, index) => {
             const isEditing = editingVehicle && editingVehicle._id === vehicle._id;
-
+            const potongannetto = (vehicle.netto * vehicle.discount) / 100;
+            const nettobersih = vehicle.netto - potongannetto;
             const formattedDate = vehicle.date
             ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
                 day: "2-digit", 
@@ -383,7 +395,7 @@ const calculateDailyIncome = (vehicles) => {
                             />
                         ) : `Rp ${vehicle.pricePerKg.toLocaleString()}`}
                     </td>
-                    <td>Rp {(vehicle.bruto && vehicle.tar) ? ((vehicle.bruto - vehicle.tar) * vehicle.pricePerKg).toLocaleString() : "-"}</td>
+                    <td>{nettobersih.toLocaleString() || "-"} Kg</td>
                     
                     <td>Rp {vehicle.totalPrice.toLocaleString()}</td>
                     <td> {vehicle.operator}</td>

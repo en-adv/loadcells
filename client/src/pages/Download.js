@@ -39,6 +39,7 @@ const Download = () => {
         saveAs(data, "Vehicle_Data.xlsx");
     };
 
+
     return (
         <div style={{ padding: 20 }}>
             <Typography variant="h5" gutterBottom>
@@ -47,6 +48,7 @@ const Download = () => {
             <Button variant="contained" color="primary" onClick={exportToExcel}>
                 Download Excel
             </Button>
+            
         </div>
     );
 };

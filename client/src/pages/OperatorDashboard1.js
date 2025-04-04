@@ -6,7 +6,6 @@ import "bootstrap/dist/css/bootstrap.min.css"; // Import Bootstrap
 const API_URL = process.env.REACT_APP_API_URL;
 const OperatorDashboard1 = () => {
     const db = database;
-    const nama = "sigala-gala";
         // State
     const [loadCell, setLoadCell] = useState(0);
     const [plateNumber, setPlateNumber] = useState("");
@@ -37,14 +36,16 @@ const OperatorDashboard1 = () => {
 
     // Fetch Price Data from MongoDB
     useEffect(() => {
-        axios.get(`${API_URL}/api/price`)
+        const operator = "Sigalagala"; // Sesuaikan atau ambil dari JWT
+        axios.get(`${API_URL}/api/price/${operator}`)   
             .then((res) => {
-                if (res.data.length > 0) {
-                    setPricePerKg(res.data[0].price);
+                if (res.data && res.data.price !== undefined) {
+                    setPricePerKg(res.data.price);
                 }
             })
-            .catch((err) => console.error("Error fetching price:", err));
+            .catch((err) => console.error("Error fetching operator price:", err));
     }, []);
+    
 
     useEffect(() => {
         const operator = "Sigalagala";  // Make sure it's dynamically assigned
@@ -108,61 +109,68 @@ const OperatorDashboard1 = () => {
     };
     
     const handlePrint = async (vehicle) => {
-        try {
-            // 1. Request a Bluetooth Device
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"], // ESC/POS UUID
-            });
-    
-            // 2. Connect to Bluetooth Device
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
-            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
-            const total = (vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100) * vehicle.pricePerKg ;
-            // 3. Generate Invoice Text with Proper ESC/POS Formatting
-            const ESC = "\x1B"; // ESC POS Command
-            const CENTER = ESC + "\x61\x01"; // Center Text
-            const LEFT = ESC + "\x61\x00"; // Left Align Text
-            const BOLD_ON = ESC + "\x45\x01"; // Bold Text On
-            const BOLD_OFF = ESC + "\x45\x00"; // Bold Text Off
-            const LINE_FEED = "\n"; // New Line
-            const SEPARATOR = "============================\n"; // Separator Line
-    
-            const invoiceText =
-                LINE_FEED +
-                CENTER + BOLD_ON + "Slip Timbangan TBS\n" + BOLD_OFF +
-                CENTER + BOLD_ON + " * Sawit Makmur *\n" + BOLD_OFF +
-                SEPARATOR +
-                CENTER + BOLD_ON + "Sigalagala HP.(0813 9777 7354)\n" + BOLD_OFF +
-                LINE_FEED +
-                LEFT + `Tanggal   : ${new Date(vehicle.date).toLocaleString("id-ID")}\n` +
-                `No Polisi    : ${vehicle.plateNumber}\n` +
-                `Bruto        : ${vehicle.bruto} Kg\n` +
-                `Tarra        : ${vehicle.tar} Kg\n` +
-                `Netto        : ${vehicle.bruto - vehicle.tar} Kg\n` +
-                `Potongan     : ${vehicle.discount}%\n` +
-                `Harga/Kg     : Rp ${vehicle.pricePerKg.toLocaleString()}\n` +
-                `Netto Bersih : ${vehicle.bruto - vehicle.tar - ((vehicle.bruto - vehicle.tar) * vehicle.discount) / 100} Kg\n` +
-                LINE_FEED +
-                `Total        : Rp ${total.toLocaleString()}\n` +
-                LINE_FEED +
-                SEPARATOR +
-                CENTER + "Terima Kasih!\n" +
-                SEPARATOR +
-                LINE_FEED.repeat(3); // Feed paper after print
-    
-            // 4. Encode and Send Data to Printer
-            let encoder = new TextEncoder();
-            let data = encoder.encode(invoiceText);
-            await characteristic.writeValue(data);
-    
-            alert("Nota Terkirim ke Printer ✅");
-        } catch (error) {
-            console.error("Bluetooth Print Error: ", error);
-            alert("Failed to print invoice. ❌");
-        }
-    };
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"],
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
+        const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
+
+        const ESC = "\x1B";
+        const CENTER = ESC + "\x61\x01";
+        const LEFT = ESC + "\x61\x00";
+        const BOLD_ON = ESC + "\x45\x01";
+        const BOLD_OFF = ESC + "\x45\x00";
+        const LINE_FEED = "\n";
+        const SEPARATOR = "================================================\n"; // 48 karakter
+
+        const netto = vehicle.bruto - vehicle.tar;
+        const total = vehicle.totalPrice.toLocaleString("id-ID");
+        const price = vehicle.pricePerKg.toLocaleString("id-ID");
+        const nettoBersih = vehicle.nettobersih.toLocaleString("id-ID");
+
+        const formatLine = (label, value) => `${label.padEnd(15)}: ${value}\n`;
+
+        const invoiceText =
+            LINE_FEED +
+            CENTER + BOLD_ON + "SLIP TIMBANGAN TBS\n" + BOLD_OFF +
+            CENTER + BOLD_ON + "  * SAWIT MAKMUR *\n" + BOLD_OFF +
+            SEPARATOR +
+            CENTER + "Sigalagala HP. (0813 9777 7354)\n" +
+            SEPARATOR +
+            LINE_FEED +
+            LEFT +
+            formatLine("Tanggal", new Date(vehicle.date).toLocaleString("id-ID")) +
+            formatLine("No Polisi", vehicle.plateNumber) +
+            formatLine("Bruto", `${vehicle.bruto} Kg`) +
+            formatLine("Tarra", `${vehicle.tar} Kg`) +
+            formatLine("Netto", `${netto} Kg`) +
+            formatLine("Potongan", `${vehicle.discount}%`) +
+            formatLine("Harga/Kg", `Rp ${price}`) +
+            formatLine("Netto Bersih", `${nettoBersih} Kg`) +
+            SEPARATOR +
+            formatLine("Total Bayar", `Rp ${total}`) +
+            LINE_FEED +
+            SEPARATOR +
+            CENTER + "NB: Tidak Menerima Buah Curian!\n" +
+            CENTER + "Terima Kasih!\n" +
+            SEPARATOR +
+            LINE_FEED.repeat(4); // Feed untuk potong kertas
+
+        let encoder = new TextEncoder();
+        let data = encoder.encode(invoiceText);
+        await characteristic.writeValue(data);
+
+        alert("Nota Terkirim ke Printer ✅");
+    } catch (error) {
+        console.error("Bluetooth Print Error: ", error);
+        alert("Gagal kirim ke printer ❌");
+    }
+};
+
     
     
     
@@ -172,7 +180,9 @@ const OperatorDashboard1 = () => {
             alert("Masukkan Nomor Kendaraan");
             return;
         }
-    
+        const netto = vehicles.netto ;
+        const potonganNetto = (netto * discount) / 100;
+        const nettobersih = Math.round(netto - potonganNetto);
         const operator = "Sigalagala";  // ✅ Replace this with actual logged-in operator
     
         const payload = {
@@ -180,6 +190,7 @@ const OperatorDashboard1 = () => {
             weight: loadCell,
             type: selectedType,
             pricePerKg,
+            nettobersih,
             discount,
             operator,
         };
@@ -313,11 +324,7 @@ const OperatorDashboard1 = () => {
         .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
         .map((vehicle, index) => {
             const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-            const totalPrice = netto * pricePerKg;
-            const discountAmount = (totalPrice * discount) / 100;
-            const finalPrice = totalPrice - discountAmount;
-            const potongannetto = (netto * discount) / 100;
-            const nettobersih = netto - potongannetto;
+            const finalPrice = vehicle.nettobersih * pricePerKg;
 
             const formattedDate = vehicle.date
                 ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
@@ -326,8 +333,7 @@ const OperatorDashboard1 = () => {
                     year: "numeric", 
                     hour: "2-digit", 
                     minute: "2-digit", 
-                    second: "2-digit",
-                    hour12: false
+                    second: "2-digit"
                   }) 
                 : "-";
 
@@ -340,7 +346,7 @@ const OperatorDashboard1 = () => {
                     <td>{netto || "-"} Kg</td> 
                     <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
                     <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
-                    <td>{nettobersih.toLocaleString() || "-"} Kg</td>
+                    <td>{vehicle.nettobersih || "-"} Kg</td>
                     <td>Rp {finalPrice.toLocaleString()}</td>
                     <td>
                         <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>

@@ -41,26 +41,31 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
     };
 
     const isOperator = ["Sigalagala", "Hapung", "Paranjulu", "Binanga", "Portibi"].includes(role);
+    const isPabrik = role === "Pabrik";
 
-const menuItems = [
-    { text: "Dashboard", icon: <DashboardIcon />, route: isOperator ? `/${role}` : "/admin" }
-];
+    let menuItems = [];
 
-if (isOperator) {
-    menuItems.push(
-        { text: "Ganti Potongan Harga", icon: <BarChartIcon />, route: `/${role}/diskon` },
-        { text: "Pesan", icon: <ChatIcon />, route: `/${role}/readmessages` }
-    );
-}
-
-if (role === "admin") {
-    menuItems.push(
-        { text: "Grafik", icon: <BarChartIcon />, route: "/admin/grafik" },
-        { text: "Download", icon: <CloudDownloadIcon />, route: "/admin/download" },
-        { text: "Pesan", icon: <ChatIcon />, route: "/admin/messages" }
-    );
-}
-
+    if (isOperator) {
+        menuItems = [
+            { text: "Dashboard", icon: <DashboardIcon />, route: `/${role}` },
+            { text: "Ganti Potongan Harga", icon: <BarChartIcon />, route: `/${role}/diskon` },
+            { text: "Pesan", icon: <ChatIcon />, route: `/${role}/readmessages` }
+        ];
+        if (role === "Sigalagala" || role === "Hapung") {
+            menuItems.push({ text: "Ganti Harga", icon: <BarChartIcon />, route: `/${role}/update-price` });
+        }
+    } else if (role === "admin") {
+        menuItems = [
+            { text: "Dashboard", icon: <DashboardIcon />, route: "/admin" },
+            { text: "Download", icon: <CloudDownloadIcon />, route: "/admin/download" },
+            { text: "Ganti Harga", icon: <BarChartIcon />, route: "/admin/update-price" },
+            { text: "Pesan", icon: <ChatIcon />, route: "/admin/messages" }
+        ];
+    } else if (isPabrik) {
+        menuItems = [
+            { text: "Dashboard Input", icon: <DashboardIcon />, route: "/pabrik" }
+        ];
+    }
 
     const drawerContent = (
         <div>
