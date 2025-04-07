@@ -19,15 +19,10 @@ router.get("/:operator", async (req, res) => {
 });
 
 // Update harga tanpa authMiddleware
+// Update harga tanpa authMiddleware
 router.post("/", async (req, res) => {
     try {
-        const { operator, price, role } = req.body;
-
-        // Cek apakah user boleh mengubah harga
-        const restrictedOperators = ["Binanga", "Paranjulu", "Portibi"];
-        if (restrictedOperators.includes(operator) && role !== "admin") {
-            return res.status(403).json({ error: "Unauthorized. Only admin can update this price." });
-        }
+        const { operator, price } = req.body;
 
         // Simpan harga ke database
         const newPrice = new Price({ operator, price });
@@ -38,5 +33,6 @@ router.post("/", async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
+
 
 export default router;

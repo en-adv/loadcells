@@ -7,16 +7,16 @@ const router = express.Router();
 router.get("/:operator", async (req, res) => {
     try {
         const { operator } = req.params;
-        console.log("Fetching discount for operator:", operator); // Debugging
+        
 
         const diskon = await Diskon.findOne({ from: operator });
 
         if (!diskon) {
-            console.log("No discount found, returning 0"); // Debugging
+           
             return res.status(404).json({ discount: 0 });
         }
 
-        console.log("Discount found:", diskon.discount); // Debugging
+      
         res.json({ discount: diskon.discount });
     } catch (error) {
         console.error("Error fetching discount:", error);

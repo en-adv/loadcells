@@ -110,6 +110,7 @@ const App = () => {
                         <Route index element={<OperatorDashboard3 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
+                        <Route path="update-price" element={<UpdatePrice operator="Paranjulu" />} />
                     </Route>
                 )}
 
@@ -118,6 +119,7 @@ const App = () => {
                         <Route index element={<OperatorDashboard4 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
+                        <Route path="update-price" element={<UpdatePrice operator="Binanga" />} />
                     </Route>
                 )}
 
@@ -126,6 +128,7 @@ const App = () => {
                         <Route index element={<OperatorDashboard5 />} />
                         <Route path="diskon" element={<Diskon />} />
                         <Route path="readmessages" element={<ReadMessagesPage />} />
+                        <Route path="update-price" element={<UpdatePrice operator="Portibi" />} />
                     </Route>
                 )}
 

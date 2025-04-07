@@ -4,208 +4,167 @@ import "bootstrap/dist/css/bootstrap.min.css";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const DashboardInput = () => {
+const DashboardInputPS = () => {
     const [plateNumber, setPlateNumber] = useState("");
     const [bruto, setBruto] = useState("");
     const [tar, setTar] = useState("");
+    const [nettoGross, setNettoGross] = useState("");
     const [discount, setDiscount] = useState("");
+    const [nettoBersih, setNettoBersih] = useState("");
     const [pricePerKg, setPricePerKg] = useState("");
-    const [search, setSearch] = useState("");
-    const [vehicles, setVehicles] = useState([]);
+    const [bongkar, setBongkar] = useState("");
+    const [muat, setMuat] = useState("");
+    const [pph, setPph] = useState("");
+    const [total, setTotal] = useState("");
+    const [entries, setEntries] = useState([]);
 
     useEffect(() => {
-        axios.get(`${API_URL}/api/vehicles`)
-            .then((res) => setVehicles(res.data))
-            .catch((err) => console.error("Error fetching vehicles:", err));
+        axios.get(`${API_URL}/api/ps`)
+            .then((res) => setEntries(res.data))
+            .catch((err) => console.error("Error fetching data:", err));
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        window.location.href = "/";
-    };
+    // Hitung nilai yang tergantung input
+    useEffect(() => {
+        const brutoNum = Number(bruto);
+        const tarNum = Number(tar);
+        const nettoGrossCalc = brutoNum && tarNum ? brutoNum - tarNum : 0;
+        setNettoGross(nettoGrossCalc);
+
+        const nettoBersihCalc = nettoGrossCalc - Number(discount || 0);
+        setNettoBersih(nettoBersihCalc);
+
+        const totalCalc = (nettoBersihCalc * Number(pricePerKg || 0)) -
+            (Number(bongkar || 0) * 16) -
+            (Number(muat || 0) * 8) -
+            Number(pph || 0);
+
+        setTotal(totalCalc >= 0 ? totalCalc : 0);
+    }, [bruto, tar, discount, pricePerKg, bongkar, muat, pph]);
+
     const handleSubmit = () => {
-        if (!plateNumber || (!bruto && !tar) || !discount || !pricePerKg) {
-            alert("Semua field harus diisi!");
+        if (!plateNumber || !bruto || !tar || !pricePerKg) {
+            alert("Semua field wajib diisi!");
             return;
         }
-    
+
         const payload = {
             plateNumber,
-            bruto: bruto ? Number(bruto) : null,
-            tar: tar ? Number(tar) : null,
+            bruto: Number(bruto),
+            tar: Number(tar),
+            nettoGross,
+            discount: Number(discount || 0),
+            nettoBersih,
             pricePerKg: Number(pricePerKg),
-            discount: Number(discount),
-            operator: "Pabrik",
+            bongkar: Number(bongkar || 0),
+            muat: Number(muat || 0),
+            pph: Number(pph || 0),
+            total,
+            date: new Date()
         };
-    
-        axios.post(`${API_URL}/api/vehicles`, payload)
+
+        axios.post(`${API_URL}/api/ps`, payload)
             .then(() => {
-                setPlateNumber("");
-                setBruto("");
-                setTar("");
-                setDiscount("");
-                setPricePerKg("");
-    
-                // Refresh daftar kendaraan
-                axios.get(`${API_URL}/api/vehicles`).then(res => setVehicles(res.data));
+                setPlateNumber(""); setBruto(""); setTar(""); setDiscount("");
+                setPricePerKg(""); setBongkar(""); setMuat(""); setPph("");
+                setNettoGross(""); setNettoBersih(""); setTotal("");
+
+                // Refresh data
+                axios.get(`${API_URL}/api/ps`).then(res => setEntries(res.data));
             })
             .catch(err => console.error("Error submitting data:", err));
-    };
-    
-    
-
-    const handlePrint = async (vehicle) => {
-        try {
-            // 1. Request a Bluetooth Device
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"], // ESC/POS UUID
-            });
-    
-            // 2. Connect to Bluetooth Device
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
-            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
-            // 3. Generate Invoice Text with Proper ESC/POS Formatting
-            const ESC = "\x1B"; // ESC POS Command
-            const CENTER = ESC + "\x61\x01"; // Center Text
-            const LEFT = ESC + "\x61\x00"; // Left Align Text
-            const BOLD_ON = ESC + "\x45\x01"; // Bold Text On
-            const BOLD_OFF = ESC + "\x45\x00"; // Bold Text Off
-            const LINE_FEED = "\n"; // New Line
-            const SEPARATOR = "================================\n"; // Separator Line
-    
-            const invoiceText =
-                LINE_FEED +
-                CENTER + BOLD_ON + "Slip Timbangan TBS\n" + BOLD_OFF +
-                CENTER + BOLD_ON + " * Sawit Makmur *\n" + BOLD_OFF +
-                SEPARATOR +
-                CENTER + BOLD_ON + "Pabrik\n" + BOLD_OFF +
-                LINE_FEED +
-                LEFT + `Tanggal   : ${new Date(vehicle.date).toLocaleString("id-ID")}\n` +
-                `No Polisi    : ${vehicle.plateNumber}\n` +
-                `Bruto        : ${vehicle.bruto} Kg\n` +
-                `Tarra        : ${vehicle.tar} Kg\n` +
-                `Netto        : ${vehicle.bruto - vehicle.tar} Kg\n` +
-                `Potongan     : ${vehicle.discount}%\n` +
-                `Harga/Kg     : Rp ${vehicle.pricePerKg.toLocaleString()}\n` +
-                `Netto Bersih : ${vehicle.nettobersih.toLocaleString()} Kg\n` +
-                LINE_FEED +
-                `Total        : Rp ${vehicle.totalPrice.toLocaleString()}\n` +
-                LINE_FEED +
-                SEPARATOR +
-                CENTER + "NB: Tidak Menerima Buah Curian !\n" +
-                CENTER + "Terima Kasih!\n" +
-                SEPARATOR +
-                LINE_FEED.repeat(3); // Feed paper after print
-    
-            // 4. Encode and Send Data to Printer
-            let encoder = new TextEncoder();
-            let data = encoder.encode(invoiceText);
-            await characteristic.writeValue(data);
-    
-            alert("Nota Terkirim ke Printer ✅");
-        } catch (error) {
-            console.error("Bluetooth Print Error: ", error);
-            alert("Failed to print invoice. ❌");
-        }
     };
 
     return (
         <div className="container mt-4">
-            <h2 className="text-center mb-4">Input Data Timbangan</h2>
-            <div className="row">
+            <h2 className="text-center mb-4">Input Data SP</h2>
+            <div className="row g-3">
                 <div className="col-md-4">
-                    <label>No Kendaraan:</label>
-                    <input type="text" className="form-control" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value.toUpperCase())} />
+                    <label>No Polisi:</label>
+                    <input className="form-control" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value.toUpperCase())} />
                 </div>
                 <div className="col-md-4">
                     <label>Bruto (Kg):</label>
                     <input type="number" className="form-control" value={bruto} onChange={(e) => setBruto(e.target.value)} />
                 </div>
                 <div className="col-md-4">
-                    <label>Tar (Kg):</label>
+                    <label>Tarre (Kg):</label>
                     <input type="number" className="form-control" value={tar} onChange={(e) => setTar(e.target.value)} />
                 </div>
-                <div className="col-md-4 mt-3">
-                    <label>Potongan (%):</label>
+                <div className="col-md-4">
+                    <label>Netto Gross (Kg):</label>
+                    <input className="form-control" value={nettoGross} disabled />
+                </div>
+                <div className="col-md-4">
+                    <label>Potongan (Kg):</label>
                     <input type="number" className="form-control" value={discount} onChange={(e) => setDiscount(e.target.value)} />
                 </div>
-                <div className="col-md-4 mt-3">
-                    <label>Harga per Kg:</label>
+                <div className="col-md-4">
+                    <label>Netto Bersih (Kg):</label>
+                    <input className="form-control" value={nettoBersih} disabled />
+                </div>
+                <div className="col-md-4">
+                    <label>Harga (Rp):</label>
                     <input type="number" className="form-control" value={pricePerKg} onChange={(e) => setPricePerKg(e.target.value)} />
                 </div>
-                <div className="col-md-4 d-grid mt-4">
-                    <button className="btn btn-primary" onClick={handleSubmit}>KIRIM</button>
+                <div className="col-md-4">
+                    <label>Bongkar (Kg):</label>
+                    <input type="number" className="form-control" value={bongkar} onChange={(e) => setBongkar(e.target.value)} />
+                </div>
+                <div className="col-md-4">
+                    <label>Muat (Kg):</label>
+                    <input type="number" className="form-control" value={muat} onChange={(e) => setMuat(e.target.value)} />
+                </div>
+                <div className="col-md-4">
+                    <label>( *):</label>
+                    <input type="number" className="form-control" value={pph} onChange={(e) => setPph(e.target.value)} />
+                </div>
+                <div className="col-md-4">
+                    <label>Total (Rp):</label>
+                    <input className="form-control" value={total.toLocaleString()} disabled />
+                </div>
+                <div className="col-md-4 d-grid">
+                    <button className="btn btn-primary mt-4" onClick={handleSubmit}>SIMPAN</button>
                 </div>
             </div>
-            <div className="col-md-4 d-grid mt-4">
-                    <button className="btn btn-danger" onClick={handleLogout}>LOGOUT</button>
-                </div>
 
-            {/* Vehicle Table */}
-            <h4 className="mt-4">Kendaraan Terdaftar</h4>
-            <input
-                type="text"
-                className="form-control mb-3"
-                placeholder="Cari Nomor Polisi..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-            />
+            {/* Tabel Data */}
+            <h4 className="mt-5">Data SP</h4>
             <div className="table-responsive">
                 <table className="table table-striped">
                     <thead className="table-dark">
                         <tr>
                             <th>Tanggal</th>
-                            <th>Nomor Polisi</th>
+                            <th>No Polisi</th>
                             <th>Bruto</th>
-                            <th>Tar</th>
-                            <th>Netto</th>
-                            <th>Potongan (%)</th>
-                            <th>Harga/Kg</th>
+                            <th>Tarre</th>
+                            <th>Netto Gross</th>
+                            <th>Potongan</th>
                             <th>Netto Bersih</th>
+                            <th>Harga</th>
+                            <th>Bongkar</th>
+                            <th>Muat</th>
+                            <th>( *)</th>
                             <th>Total</th>
-                            <th>Print</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {vehicles
-                            .filter(vehicle => vehicle.operator === "Pabrik") 
-                            .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
-                            .map((vehicle, index) => {
-                                const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-                                const finalPrice = vehicle.nettobersih * vehicle.pricePerKg;
-
-                                const formattedDate = vehicle.date
-                                    ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
-                                        day: "2-digit", 
-                                        month: "2-digit", 
-                                        year: "numeric", 
-                                        hour: "2-digit", 
-                                        minute: "2-digit", 
-                                        second: "2-digit"
-                                    }) 
-                                    : "-";
-
-                                return (
-                                    <tr key={index}>
-                                        <td>{formattedDate}</td>
-                                        <td>{vehicle.plateNumber}</td>
-                                        <td>{vehicle.bruto || "-"} Kg</td>
-                                        <td>{vehicle.tar || "-"} Kg</td>
-                                        <td>{netto || "-"} Kg</td> 
-                                        <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
-                                        <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
-                                        <td>{vehicle.nettobersih || "-"} Kg</td>
-                                        <td>Rp {finalPrice.toLocaleString()}</td>
-                                        <td>
-                                            <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>
-                                                Print Nota 🖨️
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                        {entries.map((item, idx) => (
+                            <tr key={idx}>
+                                <td>{new Date(item.date).toLocaleString("id-ID")}</td>
+                                <td>{item.plateNumber}</td>
+                                <td>{item.bruto} Kg</td>
+                                <td>{item.tar} Kg</td>
+                                <td>{item.nettoGross} Kg</td>
+                                <td>{item.discount} Kg</td>
+                                <td>{item.nettoBersih} Kg</td>
+                                <td>Rp {item.pricePerKg.toLocaleString()}</td>
+                                <td>{item.bongkar} Kg</td>
+                                <td>{item.muat} Kg</td>
+                                <td>Rp {item.pph.toLocaleString()}</td>
+                                <td>Rp {item.total.toLocaleString()}</td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>
@@ -213,4 +172,4 @@ const DashboardInput = () => {
     );
 };
 
-export default DashboardInput;
+export default DashboardInputPS;

@@ -19,7 +19,7 @@ router.post("/", async (req, res) => {
     try {
         console.log("Received request body:", req.body);
 
-        const { plateNumber, bruto, tar, pricePerKg, discount, operator } = req.body;
+        const { plateNumber, bruto, tar, pricePerKg, discount, operator} = req.body;
         const now = new Date();
 
         // Handle input bersamaan dari Pabrik
@@ -48,7 +48,7 @@ router.post("/", async (req, res) => {
 
         // --------- Logika lama ---------
         const { weight, type } = req.body;
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const oneHourAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
         let vehicle = await Vehicle.findOne({ plateNumber }).sort({ date: -1 });
 
         if (vehicle) {
@@ -83,13 +83,13 @@ router.post("/", async (req, res) => {
 
         // Hitung jika kedua nilai sudah ada
         const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-        const potongannetto = (netto * discount) / 100;
+        const potongannetto = (netto * vehicle.discount) / 100;
         const nettobersih = Math.round(netto - potongannetto);
-        const finalPrice = nettobersih * pricePerKg;
-
+        
         vehicle.netto = netto;
         vehicle.nettobersih = nettobersih;
-        vehicle.totalPrice = finalPrice;
+        vehicle.totalPrice = vehicle.nettobersih * vehicle.pricePerKg;
+
 
         await vehicle.save();
         res.json({ message: "Data kendaraan berhasil disimpan", vehicle });

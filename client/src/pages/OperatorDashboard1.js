@@ -86,7 +86,7 @@ const OperatorDashboard1 = () => {
                 axios.get(`${API_URL}/api/threshold/${operator}`)
                     .then((thresholdRes) => {
                         const lastThreshold = thresholdRes.data?.lastThreshold || 0;
-                        let nextThreshold = Math.floor(todayTotal / 10000) * 10000;
+                        let nextThreshold = Math.floor(todayTotal / 30000) * 30000;
     
                         if (todayTotal >= nextThreshold && nextThreshold > lastThreshold) {
                             console.log("🎉 Showing notification!");
@@ -109,70 +109,72 @@ const OperatorDashboard1 = () => {
     };
     
     const handlePrint = async (vehicle) => {
-    try {
-        const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"],
-        });
+        try {
+            // 1. Request a Bluetooth Device
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"], // ESC/POS UUID
+            });
+            const finalPrice = vehicle.nettobersih * vehicle.pricePerKg;
+            // 2. Connect to Bluetooth Device
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
+            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
+            // 3. Generate Invoice Text with Proper ESC/POS Formatting
+                        const ESC = "\x1B";
+            const CENTER = ESC + "\x61\x01";
+            const LEFT = ESC + "\x61\x00";
+            const BOLD_ON = ESC + "\x45\x01";
+            const BOLD_OFF = ESC + "\x45\x00";
+            const FONT_DOUBLE = ESC + "\x21\x21"; // Double height & width
+            const FONT_NORMAL = ESC + "\x21\x21";
+            const LINE_FEED = "\n";
+            const SEPARATOR = "================================\n"; 
 
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
-        const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
-
-        const ESC = "\x1B";
-        const CENTER = ESC + "\x61\x01";
-        const LEFT = ESC + "\x61\x00";
-        const BOLD_ON = ESC + "\x45\x01";
-        const BOLD_OFF = ESC + "\x45\x00";
-        const LINE_FEED = "\n";
-        const SEPARATOR = "================================================\n"; // 48 karakter
-
-        const netto = vehicle.bruto - vehicle.tar;
-        const total = vehicle.totalPrice.toLocaleString("id-ID");
-        const price = vehicle.pricePerKg.toLocaleString("id-ID");
-        const nettoBersih = vehicle.nettobersih.toLocaleString("id-ID");
-
-        const formatLine = (label, value) => `${label.padEnd(15)}: ${value}\n`;
-
-        const invoiceText =
+    
+                    const invoiceText =
             LINE_FEED +
-            CENTER + BOLD_ON + "SLIP TIMBANGAN TBS\n" + BOLD_OFF +
-            CENTER + BOLD_ON + "  * SAWIT MAKMUR *\n" + BOLD_OFF +
+            CENTER + FONT_DOUBLE + "Slip Pembayaran TBS\n" + FONT_NORMAL +
+            CENTER + BOLD_ON + " * Bintang Sawit Makmur *\n" + BOLD_OFF +
             SEPARATOR +
             CENTER + "Sigalagala HP. (0813 9777 7354)\n" +
-            SEPARATOR +
             LINE_FEED +
             LEFT +
-            formatLine("Tanggal", new Date(vehicle.date).toLocaleString("id-ID")) +
-            formatLine("No Polisi", vehicle.plateNumber) +
-            formatLine("Bruto", `${vehicle.bruto} Kg`) +
-            formatLine("Tarra", `${vehicle.tar} Kg`) +
-            formatLine("Netto", `${netto} Kg`) +
-            formatLine("Potongan", `${vehicle.discount}%`) +
-            formatLine("Harga/Kg", `Rp ${price}`) +
-            formatLine("Netto Bersih", `${nettoBersih} Kg`) +
-            SEPARATOR +
-            formatLine("Total Bayar", `Rp ${total}`) +
+            `Tanggal    : ${new Date(vehicle.date).toLocaleString("id-ID")}\n` +
+            `No Polisi     : ${vehicle.plateNumber}\n` +
+            `Bruto         : ${vehicle.bruto} Kg\n` +
+            `Tarra         : ${vehicle.tar} Kg\n` +
+            `Netto         : ${vehicle.bruto - vehicle.tar} Kg\n` +
+            `Potongan      : ${vehicle.discount}%\n` +
+            `Harga/Kg      : Rp ${vehicle.pricePerKg.toLocaleString()}\n` +
+            `Netto Bersih  : ${vehicle.nettobersih.toLocaleString()} Kg\n` +
+            FONT_DOUBLE + `Total         : Rp ${finalPrice.toLocaleString()}\n` + FONT_NORMAL +
             LINE_FEED +
             SEPARATOR +
-            CENTER + "NB: Tidak Menerima Buah Curian!\n" +
+            CENTER + "NB: Tidak Menerima Buah Curian !\n" +
             CENTER + "Terima Kasih!\n" +
-            SEPARATOR +
-            LINE_FEED.repeat(4); // Feed untuk potong kertas
+            LINE_FEED.repeat(3);
 
-        let encoder = new TextEncoder();
-        let data = encoder.encode(invoiceText);
-        await characteristic.writeValue(data);
-
-        alert("Nota Terkirim ke Printer ✅");
-    } catch (error) {
-        console.error("Bluetooth Print Error: ", error);
-        alert("Gagal kirim ke printer ❌");
-    }
-};
-
+            // 4. Encode and Send Data to Printer
+            let encoder = new TextEncoder();
+            let data = encoder.encode(invoiceText);
+            await characteristic.writeValue(data);
     
+            alert("Nota Terkirim ke Printer ✅");
+        } catch (error) {
+            console.error("Bluetooth Print Error: ", error);
+            alert("Gagal Mencetak No ❌");
+        }
+    };
     
+    const totalPembayaran = vehicles
+  .filter(v => v.operator === "Sigalagala" && v.nettobersih && v.pricePerKg)
+  .reduce((sum, v) => sum + v.nettobersih * v.pricePerKg, 0);
+
+  const totalNettoBersih = vehicles
+  .filter(v => v.operator === "Sigalagala" && v.nettobersih)
+  .reduce((sum, v) => sum + v.nettobersih, 0);
+
     
     // Submit Weight Data
     const handleSubmit = () => {
@@ -180,9 +182,6 @@ const OperatorDashboard1 = () => {
             alert("Masukkan Nomor Kendaraan");
             return;
         }
-        const netto = vehicles.netto ;
-        const potonganNetto = (netto * discount) / 100;
-        const nettobersih = Math.round(netto - potonganNetto);
         const operator = "Sigalagala";  // ✅ Replace this with actual logged-in operator
     
         const payload = {
@@ -190,7 +189,6 @@ const OperatorDashboard1 = () => {
             weight: loadCell,
             type: selectedType,
             pricePerKg,
-            nettobersih,
             discount,
             operator,
         };
@@ -217,7 +215,7 @@ const OperatorDashboard1 = () => {
                                 <h5 className="modal-title">Pemberitahuan !!</h5>
                             </div>
                             <div className="modal-body">
-                                <p>Total berat sawit <strong>{totalNetto.toLocaleString()}</strong> kg! dan telah mencapai lebih dari 10 Ton.</p>
+                                <p>Total berat sawit <strong>{totalNetto.toLocaleString()}</strong> kg! dan telah mencapai lebih dari 30 Ton.</p>
                                 <p>Silahkan timbang muatan tronton.</p>
                             </div>
                             <div className="modal-footer">
@@ -250,12 +248,37 @@ const OperatorDashboard1 = () => {
                         </div>
                     </div>
                 </div>
-
+                
+               
                 <div className="col-md-4 mb-3">
                     <div className="card text-center">
                         <div className="card-body">
                             <h5 className="card-title">Potongan Harga</h5>
                             <h3 className="text-danger">{discount ? `${discount}%` : "0%"}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-md-4 mb-3">
+                    <div className="card text-center">
+                        <div className="card-body">
+                            <h5 className="card-title">Total Netto Kotor</h5>
+                            <h3 className="text-success"> {totalNetto.toLocaleString()} Kg</h3>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-md-4 mb-3">
+                    <div className="card text-center">
+                        <div className="card-body">
+                            <h5 className="card-title">Total Netto Bersih</h5>
+                            <h3 className="text-success"> {totalNettoBersih.toLocaleString()} Kg</h3>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-md-4 mb-3">
+                    <div className="card text-center">
+                        <div className="card-body">
+                            <h5 className="card-title">Total Pembayaran</h5>
+                            <h3 className="text-success">Rp {totalPembayaran.toLocaleString()}</h3>
                         </div>
                     </div>
                 </div>
@@ -324,7 +347,7 @@ const OperatorDashboard1 = () => {
         .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
         .map((vehicle, index) => {
             const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-            const finalPrice = vehicle.nettobersih * pricePerKg;
+            const finalPrice = vehicle.nettobersih * vehicle.pricePerKg;
 
             const formattedDate = vehicle.date
                 ? new Date(vehicle.date).toLocaleDateString("id-ID", { 

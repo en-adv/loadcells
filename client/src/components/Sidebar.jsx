@@ -49,11 +49,9 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
         menuItems = [
             { text: "Dashboard", icon: <DashboardIcon />, route: `/${role}` },
             { text: "Ganti Potongan Harga", icon: <BarChartIcon />, route: `/${role}/diskon` },
-            { text: "Pesan", icon: <ChatIcon />, route: `/${role}/readmessages` }
+            { text: "Pesan", icon: <ChatIcon />, route: `/${role}/readmessages` },
+            { text: "Ganti Harga", icon: <BarChartIcon />, route: `/${role}/update-price` }
         ];
-        if (role === "Sigalagala" || role === "Hapung") {
-            menuItems.push({ text: "Ganti Harga", icon: <BarChartIcon />, route: `/${role}/update-price` });
-        }
     } else if (role === "admin") {
         menuItems = [
             { text: "Dashboard", icon: <DashboardIcon />, route: "/admin" },

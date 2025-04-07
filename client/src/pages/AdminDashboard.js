@@ -32,12 +32,13 @@ const [prices, setPrices] = useState({
 
     const [vehicles, setVehicles] = useState([]);
     const [search, setSearch] = useState("");
-    const [pricePerKg, setPricePerKg] = useState(0);
     const [totalIncome, setTotalIncome] = useState(0); // ✅ Store daily total income
     const [editingVehicle, setEditingVehicle] = useState(null);
     const [selectedOperator, setSelectedOperator] = useState("");
     const uniqueOperators = [...new Set(vehicles.map((v) => v.operator))];
     const [reloadData, setReloadData] = useState(false);
+    const [rekapPerOperator, setRekapPerOperator] = useState({});
+
 
      // ✅ Fetch all timbangans from Firebase
      useEffect(() => {
@@ -103,6 +104,31 @@ useEffect(() => {
     });
 }, [reloadData]);
 
+useEffect(() => {
+    const rekap = {};
+
+    vehicles.forEach(vehicle => {
+        const operator = vehicle.operator;
+
+        if (!rekap[operator]) {
+            rekap[operator] = {
+                netto: 0,
+                nettoBersih: 0,
+                total: 0,
+            };
+        }
+
+        const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
+        const discount = vehicle.discount || 0;
+        const nettoBersih = Math.round(netto - ((netto * discount) / 100));
+        
+        rekap[operator].netto += netto;
+        rekap[operator].nettoBersih += nettoBersih;
+        rekap[operator].total += vehicle.totalPrice || 0;
+    });
+
+    setRekapPerOperator(rekap);
+}, [vehicles]);
 
 
 useEffect(() => {
@@ -231,37 +257,55 @@ const calculateDailyIncome = (vehicles) => {
 
            {/* ✅ Cards Section for all timbangans */}
            <div className="row">
-                    {Object.entries(loadCells).map(([key, value]) => {
-                        const location = key.charAt(0).toUpperCase() + key.slice(1); // Capitalize
-                        const harga = prices[location] || 0;
+           {Object.entries(loadCells).map(([key, value]) => {
+        const keyToLocation = {
+            sigalaGala: "Sigalagala",
+            hapung: "Hapung",
+            paranjulu: "Paranjulu",
+            binanga: "Binanga",
+            portibi: "Portibi",
+        };
+        
+        const location = keyToLocation[key];
+        // Capitalize
+        const harga = prices[location] || 0;
 
-                        return (
-                        <div className="col-md-4 mb-3" key={key}>
-                            <div className="card text-center">
-                            <div className="card-body">
-                                <h5 className="card-title">Timbangan {location}</h5>
-                                <h3 className="text-primary">{value.toLocaleString()} kg</h3>
-                                <h6 className="text-success mt-2">Harga/kg: Rp {harga.toLocaleString()}</h6>
-                            </div>
+        const rekap = rekapPerOperator[location] || {
+            netto: 0,
+            nettoBersih: 0,
+            total: 0
+        };
+
+        return (
+            <div className="col-md-4 mb-3" key={key}>
+                <div className="card text-center ">
+                    <div className="card-body">
+                        <h2 className="card-title">Timbangan {location}</h2>
+                        <h3 className="text-danger">Realtime: {value.toLocaleString()} kg</h3>
+                        <h4 className="text-success">Harga/kg: Rp {harga.toLocaleString()}</h4>
+                        <h4 className="text-danger">Netto Kotor  : {rekap.netto.toLocaleString()} Kg </h4>
+                        <h4 className="text-success">Netto Bersih : {rekap.nettoBersih.toLocaleString()} Kg</h4>
+                        <h4 className="text-danger">Total Bayar  : Rp {rekap.total.toLocaleString()}</h4>
+                    </div>
+                </div>
+            </div>
+        );
+    })}
+                    <div className="col-md-4 mb-3">
+                        <div >
+                            <div className="card text-center bg-success text-white">
+                                <div className="card-body">
+                                    <h2 className="card-title text-white">Total Pembelian</h2>
+                                    <h3>Rp {totalIncome.toLocaleString()}</h3>
+                                    <hr></hr>
+                                    <hr></hr>
+                                    <hr></hr>
+                                    <hr></hr>
+                                    <h4 className="mt-2">Total Netto Bersih Hari Ini: {totalNetto.toLocaleString()} Kg</h4>
+                                </div>
                             </div>
                         </div>
-                        );
-                    })}
-
-              
-
-                <div className="row justify-content-center">
-    <div className="col-md-6">
-        <div className="card text-center bg-success text-white">
-            <div className="card-body">
-                <h5 className="card-title text-white">Total Pembelian Hari Ini</h5>
-                <h3>Rp {totalIncome.toLocaleString()}</h3>
-                <h5 className="mt-2">Total Netto Hari Ini: {totalNetto.toLocaleString()} Kg</h5>
-            </div>
-        </div>
-    </div>
-</div>
-
+                    </div>
             </div>
 
             
@@ -328,7 +372,7 @@ const calculateDailyIncome = (vehicles) => {
         .map((vehicle, index) => {
             const isEditing = editingVehicle && editingVehicle._id === vehicle._id;
             const potongannetto = (vehicle.netto * vehicle.discount) / 100;
-            const nettobersih = vehicle.netto - potongannetto;
+            const nettobersih = Math.round(vehicle.netto - potongannetto);
             const formattedDate = vehicle.date
             ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
                 day: "2-digit", 

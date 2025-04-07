@@ -8,7 +8,9 @@ import vehicleRoutes from './routes/vehicleRoutes.js';
 import priceRoutes from './routes/priceRoutes.js';
 import diskonRoutes from './routes/diskonRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
-import thresholdRoutes from './routes/thresholdRoutes.js'
+import thresholdRoutes from './routes/thresholdRoutes.js';
+import  psRoutes from './routes/psRoutes.js';
+
 
 
 const app = express();
@@ -26,6 +28,7 @@ app.use('/api/price', priceRoutes);
 app.use("/api/discount", diskonRoutes);
 app.use("/api", messageRoutes);
 app.use("/api/threshold", thresholdRoutes);
+app.use("/api/ps", psRoutes);
 ;
 
 app.listen(5000, () => console.log('Server running on port 5000'));
