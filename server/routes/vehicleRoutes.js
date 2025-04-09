@@ -1,7 +1,5 @@
 import express from 'express';
 import Vehicle from '../models/Vehicle.js';
-import Price from '../models/Price.js';
-import Diskon from '../models/Diskon.js'; // Import discount model
 
 const router = express.Router();
 

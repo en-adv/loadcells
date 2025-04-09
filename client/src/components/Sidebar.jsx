@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
     Drawer, List, ListItem, ListItemIcon, ListItemText, Toolbar, Divider,
-    IconButton, Button, useMediaQuery, Box
+    IconButton, Button, useMediaQuery, Box, Typography, Chip
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -11,6 +11,8 @@ import ChatIcon from "@mui/icons-material/Chat";
 import CloudDownloadIcon from "@mui/icons-material/CloudDownload";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import { jwtDecode } from "jwt-decode";
+import { ref, onValue, off } from "firebase/database";
+import { database } from "../firebaseConfig";
 
 const drawerWidth = 250;
 
@@ -20,6 +22,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
     const isMobile = useMediaQuery("(max-width: 768px)");
     const [username, setUsername] = useState("");
     const [role, setRole] = useState("");
+    const [firebaseConnected, setFirebaseConnected] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -33,6 +36,17 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                 setRole("");
             }
         }
+    }, []);
+
+    useEffect(() => {
+        const connectedRef = ref(database, ".info/connected");
+        const connectedListener = onValue(connectedRef, (snap) => {
+            setFirebaseConnected(snap.val() === true);
+        });
+
+        return () => {
+            off(connectedRef);
+        };
     }, []);
 
     const handleLogout = () => {
@@ -55,8 +69,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
     } else if (role === "admin") {
         menuItems = [
             { text: "Dashboard", icon: <DashboardIcon />, route: "/admin" },
-            { text: "Download", icon: <CloudDownloadIcon />, route: "/admin/download" },
-            { text: "Ganti Harga", icon: <BarChartIcon />, route: "/admin/update-price" },
+            { text: "SP Summary", icon: <BarChartIcon />, route: "/admin/sp-summary" },
             { text: "Pesan", icon: <ChatIcon />, route: "/admin/messages" }
         ];
     } else if (isPabrik) {
@@ -66,16 +79,30 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
     }
 
     const drawerContent = (
-        <div>
-            <Toolbar>
-                <h5 style={{ color: "#2D336B", margin: "center", fontFamily: "Kanit, sans-serif", fontWeight: "bolder", fontSize: "22px" }}>
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Toolbar sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                minHeight: '80px !important'
+            }}>
+                <Typography
+                    variant="h6"
+                    sx={{
+                        color: "#2D336B",
+                        fontFamily: "Kanit, sans-serif",
+                        fontWeight: "bolder",
+                        fontSize: "22px",
+                        textAlign: "center"
+                    }}
+                >
                     PT. SAWIT MAKMUR
-                </h5>
+                </Typography>
             </Toolbar>
-            <Divider />
-            <List>
+            <Divider sx={{ borderColor: '#2D336B', opacity: 0.2 }} />
+            <List sx={{ flex: 1, py: 2 }}>
                 {menuItems.map((item) => {
-                    const isActive = location.pathname.startsWith(item.route);
+                    const isActive = location.pathname === item.route;
                     return (
                         <ListItem
                             button
@@ -83,17 +110,29 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                             onClick={() => navigate(item.route)}
                             sx={{
                                 backgroundColor: isActive ? "#A9B5DF" : "transparent",
-                                "&:hover": { backgroundColor: "#7886C7" },
+                                "&:hover": { 
+                                    backgroundColor: "#7886C7",
+                                    transform: 'translateX(5px)',
+                                    transition: 'all 0.2s ease-in-out'
+                                },
+                                mb: 1,
+                                borderRadius: '8px',
+                                mx: 1
                             }}
                         >
-                            <ListItemIcon sx={{ color: "#2D336B" }}>{item.icon}</ListItemIcon>
+                            <ListItemIcon sx={{ 
+                                color: "#2D336B",
+                                minWidth: '40px'
+                            }}>
+                                {item.icon}
+                            </ListItemIcon>
                             <ListItemText
                                 primary={item.text}
                                 primaryTypographyProps={{
                                     style: {
                                         color: "#2D336B",
                                         fontFamily: "Kanit, sans-serif",
-                                        fontWeight: "normal"
+                                        fontWeight: isActive ? "bold" : "normal"
                                     }
                                 }}
                             />
@@ -102,14 +141,32 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                 })}
             </List>
 
-            {/* Logout Button */}
-            <Box sx={{ position: "absolute", bottom: 20, left: 20, right: 20 }}>
+            {/* Firebase Connection Status */}
+            <Box sx={{ p: 2, mt: 'auto' }}>
+                <Chip
+                    label={firebaseConnected ? "Firebase Connected" : "Firebase Disconnected"}
+                    color={firebaseConnected ? "success" : "error"}
+                    sx={{
+                        width: '100%',
+                        mb: 2,
+                        '& .MuiChip-label': {
+                            fontWeight: 'bold'
+                        }
+                    }}
+                />
                 <Button
                     variant="contained"
                     fullWidth
                     sx={{
                         backgroundColor: "#2D336B",
-                        "&:hover": { backgroundColor: "#7886C7" },
+                        "&:hover": { 
+                            backgroundColor: "#7886C7",
+                            transform: 'translateY(-2px)',
+                            transition: 'all 0.2s ease-in-out'
+                        },
+                        py: 1.5,
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                     }}
                     onClick={handleLogout}
                     startIcon={<ExitToAppIcon />}
@@ -117,14 +174,47 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                     Logout
                 </Button>
             </Box>
-        </div>
+        </Box>
     );
 
     return (
         <>
             {isMobile && (
                 <IconButton
-                    sx={{ position: "absolute", top: 10, left: 10, color: "#2D336B", zIndex: 1300 }}
+                    aria-label="toggle menu"
+                    aria-expanded={mobileOpen}
+                    aria-controls="sidebar-drawer"
+                    sx={{ 
+                        position: "fixed", 
+                        top: 16, 
+                        left: mobileOpen ? drawerWidth + 16 : 16, 
+                        color: "#2D336B", 
+                        zIndex: 1400,
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        width: 48,
+                        height: 48,
+                        '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 1)',
+                            transform: 'scale(1.05)',
+                            boxShadow: '0 4px 12px rgba(45, 51, 107, 0.15)'
+                        },
+                        '&:focus': {
+                            outline: '2px solid #2D336B',
+                            outlineOffset: '2px',
+                            backgroundColor: 'rgba(255, 255, 255, 1)'
+                        },
+                        '&:active': {
+                            transform: 'scale(0.95)',
+                            boxShadow: '0 2px 6px rgba(45, 51, 107, 0.1)'
+                        },
+                        boxShadow: '0 2px 8px rgba(45, 51, 107, 0.1)',
+                        borderRadius: '14px',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        '& .MuiSvgIcon-root': {
+                            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            transform: mobileOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+                        }
+                    }}
                     onClick={handleDrawerToggle}
                 >
                     <MenuIcon />
@@ -132,6 +222,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
             )}
             
             <Drawer
+                id="sidebar-drawer"
                 variant={isMobile ? "temporary" : "permanent"}
                 open={mobileOpen}
                 onClose={handleDrawerToggle}
@@ -143,6 +234,9 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                         boxSizing: "border-box",
                         bgcolor: "#e4e3f0",
                         color: "#2D336B",
+                        boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+                        borderRight: 'none',
+                        zIndex: 1300
                     },
                 }}
             >

@@ -16,7 +16,13 @@ import ChatPage from "./pages/ChatPage";
 import Diskon from "./pages/OperatorDiscount";
 import UpdatePrice from "./pages/UpdatePrice";
 import ReadMessagesPage from "./pages/ReadMessagesPage";
+import SPSummary from "./pages/SPSummary";
 import "bootstrap/dist/css/bootstrap.min.css";
+
+const PrivateRoute = ({ children }) => {
+    const token = localStorage.getItem("token");
+    return token ? children : <Navigate to="/login" />;
+};
 
 const App = () => {
     const [auth, setAuth] = useState(null);
@@ -82,7 +88,7 @@ const App = () => {
                         <Route path="messages" element={<ChatPage />} />
                         <Route path="Readmessages" element={<ReadMessagesPage />} />
                         <Route path="update-price" element={<UpdatePrice />} />
-
+                        <Route path="sp-summary" element={<SPSummary />} />
                     </Route>
                 )}
 

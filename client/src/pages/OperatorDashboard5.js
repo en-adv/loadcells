@@ -3,6 +3,7 @@ import { ref, onValue } from "firebase/database";
 import { database } from "../firebaseConfig";
 import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css"; // Import Bootstrap
+import { checkSession, updateLastActivity, clearSession } from '../utils/sessionManager';
 const API_URL = process.env.REACT_APP_API_URL;
 const OperatorDashboard5 = () => {
     const db = database;
@@ -17,6 +18,9 @@ const OperatorDashboard5 = () => {
     const [discount, setDiscount] = useState(0);
     const [totalNetto, setTotalNetto] = useState(0);
     const [showNotification, setShowNotification] = useState(false);
+    const [currentVehicle, setCurrentVehicle] = useState(null);
+    const [inputStatus, setInputStatus] = useState(""); // New state for input status
+    const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
 
     // Fetch Load Cell Data from Firebase
     useEffect(() => {
@@ -175,36 +179,141 @@ const OperatorDashboard5 = () => {
     .filter(v => v.operator === "Portibi" && v.nettobersih)
     .reduce((sum, v) => sum + v.nettobersih, 0);
   
-    // Submit Weight Data
-    const handleSubmit = () => {
+    // Add this new function to check vehicle status
+    const checkVehicleStatus = (plateNumber) => {
+        const today = new Date().toISOString().split('T')[0];
+        const vehicle = vehicles.find(v => 
+            v.plateNumber === plateNumber && 
+            v.date && 
+            new Date(v.date).toISOString().split('T')[0] === today
+        );
+
+        if (vehicle) {
+            if (vehicle.bruto && !vehicle.tar) {
+                setInputStatus("Menunggu Tarra");
+                setSelectedType("Tar");
+            } else if (vehicle.bruto && vehicle.tar) {
+                setInputStatus("Selesai");
+            } else {
+                setInputStatus("Menunggu Bruto");
+                setSelectedType("Bruto");
+            }
+            setCurrentVehicle(vehicle);
+        } else {
+            setInputStatus("Kendaraan Baru");
+            setSelectedType("Bruto");
+            setCurrentVehicle(null);
+        }
+    };
+
+    // Modify the plateNumber onChange handler
+    const handlePlateNumberChange = (e) => {
+        const value = e.target.value.toUpperCase().replace(/\s/g, "");
+        setPlateNumber(value);
+        checkVehicleStatus(value);
+    };
+
+    // Add session check on component mount
+    useEffect(() => {
+        if (!checkSession()) {
+            return;
+        }
+
+        // Update activity on user interaction
+        const handleUserActivity = () => {
+            updateLastActivity();
+        };
+
+        // Add event listeners for user activity
+        window.addEventListener('mousemove', handleUserActivity);
+        window.addEventListener('keydown', handleUserActivity);
+        window.addEventListener('click', handleUserActivity);
+
+        // Check session periodically
+        const sessionCheckInterval = setInterval(() => {
+            if (!checkSession()) {
+                clearInterval(sessionCheckInterval);
+            }
+        }, 60000); // Check every minute
+
+        return () => {
+            window.removeEventListener('mousemove', handleUserActivity);
+            window.removeEventListener('keydown', handleUserActivity);
+            window.removeEventListener('click', handleUserActivity);
+            clearInterval(sessionCheckInterval);
+        };
+    }, []);
+
+    // Update handleSubmit to check session
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (!checkSession()) {
+            return;
+        }
+
         if (!plateNumber) {
             alert("Masukkan Nomor Kendaraan");
             return;
         }
-        const netto = vehicles.netto ;
-        const potonganNetto = (netto * discount) / 100;
-        const nettobersih = Math.round(netto - potonganNetto);
-    
-        const operator = "Portibi";  // ✅ Replace this with actual logged-in operator
-    
+
+        if (loadCell <= 0) {
+            alert("Berat tidak valid. Pastikan timbangan terhubung dan menunjukkan nilai yang benar.");
+            return;
+        }
+
+        const operator = "Portibi";
+        const today = new Date().toISOString().split('T')[0];
+        const vehicle = vehicles.find(v => 
+            v.plateNumber === plateNumber && 
+            v.date && 
+            new Date(v.date).toISOString().split('T')[0] === today
+        );
+
+        // Validate input sequence
+        if (selectedType === "Tar" && (!vehicle || !vehicle.bruto)) {
+            alert("Bruto harus diinput terlebih dahulu sebelum Tarra");
+            return;
+        }
+
+        if (selectedType === "Bruto" && vehicle && vehicle.bruto) {
+            alert("Bruto sudah diinput sebelumnya");
+            return;
+        }
+
         const payload = {
             plateNumber,
             weight: loadCell,
             type: selectedType,
             pricePerKg,
             discount,
-            nettobersih,
             operator,
+            date: new Date().toISOString() // Add current timestamp
         };
-    
+
         axios.post(`${API_URL}/api/vehicles`, payload)
             .then(() => {
                 setPlateNumber("");
-                axios.get(`${API_URL}/api/vehicles`).then(res => setVehicles(res.data));
+                setInputStatus("");
+                setCurrentVehicle(null);
+                axios.get(`${API_URL}/api/vehicles`).then(res => {
+                    setVehicles(res.data);
+                    checkVehicleStatus(plateNumber);
+                });
             })
-            .catch(err => console.error("Error submitting data:", err));
+            .catch(err => {
+                console.error("Error submitting data:", err);
+                alert(err.response?.data?.message || "Terjadi kesalahan saat menyimpan data");
+            });
     };
-    
+
+    // Add clear form function
+    const handleClearForm = () => {
+        setPlateNumber("");
+        setSelectedType("Bruto");
+        setInputStatus("");
+        setCurrentVehicle(null);
+    };
 
     return (
         <div className="container mt-4">
@@ -295,8 +404,13 @@ const OperatorDashboard5 = () => {
                         type="text"
                         className="form-control"
                         value={plateNumber}
-                        onChange={(e) => setPlateNumber(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                        onChange={handlePlateNumberChange}
                     />
+                    {inputStatus && (
+                        <div className="mt-2 p-2 rounded bg-success text-white">
+                            Status: {inputStatus}
+                        </div>
+                    )}
                 </div>
 
                 <div className="col-md-4">
@@ -305,35 +419,57 @@ const OperatorDashboard5 = () => {
                         className="form-select"
                         value={selectedType}
                         onChange={(e) => setSelectedType(e.target.value)}
+                        disabled={inputStatus === "Selesai"}
                     >
                         <option value="Bruto">Bruto</option>
                         <option value="Tar">Tar</option>
                     </select>
                 </div>
 
-                <div className="col-md-2 d-grid">
-                <button className="btn kirim-button mt-4" onClick={handleSubmit}>KIRIM</button>
+                <div className="col-md-2 d-grid gap-2">
+                    <button className="btn kirim-button mt-4" onClick={handleSubmit}>
+                        KIRIM
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleClearForm}>
+                        CLEAR
+                    </button>
                 </div>
             </div>
 
-            {/* Search Bar */}
-            <div className="mt-3">
-                <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Cari Nomor Kendaraan"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+            {/* Search and Filter Section */}
+            <div className="row mt-3">
+                <div className="col-md-8">
+                    <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Cari Nomor Kendaraan"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+                <div className="col-md-4">
+                    <div className="form-check">
+                        <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="showIncomplete"
+                            checked={showIncompleteOnly}
+                            onChange={(e) => setShowIncompleteOnly(e.target.checked)}
+                        />
+                        <label className="form-check-label" htmlFor="showIncomplete">
+                            Tampilkan Kendaraan Belum Lengkap
+                        </label>
+                    </div>
+                </div>
             </div>
 
             {/* Vehicle Table */}
             <h4 className="mt-2">Kendaraan Terdaftar</h4>
             <div className="table-responsive">
-                 <table className="table custom-table">
-               <thead className="custom-thead">    
+                <table className="table custom-table">
+                    <thead className="custom-thead">    
                         <tr>
-                        <th>Tanggal</th>
+                            <th>Tanggal</th>
                             <th>Nomor Polisi</th>
                             <th>Brutto</th>
                             <th>Tarra</th>
@@ -341,50 +477,56 @@ const OperatorDashboard5 = () => {
                             <th>Potongan (%)</th>       
                             <th>Harga/Kg</th>
                             <th>Netto Bersih</th>
-                            <th>Total </th>
+                            <th>Total</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-    {vehicles
-        .filter(vehicle => vehicle.operator === "Portibi") // Adjust for dynamic operator filtering
-        .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
-        .map((vehicle, index) => {
-            const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
-            const finalPrice = vehicle.nettobersih * vehicle.pricePerKg;
-            
+                        {vehicles
+                            .filter(vehicle => vehicle.operator === "Portibi")
+                            .filter(vehicle => {
+                                if (showIncompleteOnly) {
+                                    return vehicle.bruto && !vehicle.tar;
+                                }
+                                return true;
+                            })
+                            .filter(vehicle => vehicle.plateNumber.includes(search.toUpperCase()))
+                            .sort((a, b) => new Date(b.date) - new Date(a.date))
+                            .map((vehicle, index) => {
+                                const netto = vehicle.bruto && vehicle.tar ? vehicle.bruto - vehicle.tar : 0;
+                                const finalPrice = vehicle.nettobersih * vehicle.pricePerKg;
 
-            const formattedDate = vehicle.date
-                ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
-                    day: "2-digit", 
-                    month: "2-digit", 
-                    year: "numeric", 
-                    hour: "2-digit", 
-                    minute: "2-digit", 
-                    second: "2-digit"
-                  }) 
-                : "-";
+                                const formattedDate = vehicle.date
+                                    ? new Date(vehicle.date).toLocaleDateString("id-ID", { 
+                                        day: "2-digit", 
+                                        month: "2-digit", 
+                                        year: "numeric", 
+                                        hour: "2-digit", 
+                                        minute: "2-digit", 
+                                        second: "2-digit"
+                                      }) 
+                                    : "-";
 
-            return (
-                <tr key={index}>
-                    <td>{formattedDate}</td>
-                    <td>{vehicle.plateNumber}</td>
-                    <td>{vehicle.bruto || "-"} Kg</td>
-                    <td>{vehicle.tar || "-"} Kg</td>
-                    <td>{netto || "-"} Kg</td> 
-                    <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
-                    <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
-                    <td>{vehicle.nettobersih || "-"} Kg</td>
-                    <td>Rp {finalPrice.toLocaleString()}</td>
-                    <td>
-                        <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>
-                            Print Nota 🖨️
-                        </button>
-                    </td>
-                </tr>
-            );
-        })}
-</tbody>
-
+                                return (
+                                    <tr key={index}>
+                                        <td>{formattedDate}</td>
+                                        <td>{vehicle.plateNumber}</td>
+                                        <td>{vehicle.bruto || "-"} Kg</td>
+                                        <td>{vehicle.tar || "-"} Kg</td>
+                                        <td>{netto || "-"} Kg</td> 
+                                        <td>{vehicle.discount !== undefined ? vehicle.discount : "0"}%</td>
+                                        <td>Rp {vehicle.pricePerKg.toLocaleString() || "-"}</td> 
+                                        <td>{vehicle.nettobersih || "-"} Kg</td>
+                                        <td>Rp {finalPrice.toLocaleString()}</td>
+                                        <td>
+                                            <button className="btn btn-primary btn-sm" onClick={() => handlePrint(vehicle)}>
+                                                Print Nota 🖨️
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                    </tbody>
                 </table>
             </div>
         </div>
