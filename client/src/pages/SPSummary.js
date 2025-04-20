@@ -660,15 +660,16 @@ const SPSummary = () => {
                                                 )}
                                                 {sortConfig.key !== "vehicleId" && <FaSort className="ms-1" />}
                                             </th>
-                                            <th className="text-end">Weight In (Kg)</th>
-                                            <th className="text-end">Weight Out (Kg)</th>
-                                            <th className="text-end">Net Gross (Kg)</th>
-                                            <th className="text-end">Loose Weight (Kg)</th>
-                                            <th className="text-end">Penalty (Kg)</th>
-                                            <th className="text-end">Net Weight (Kg)</th>
-                                            <th className="text-end">Price (Rp)</th>
-                                            <th className="text-end">Komidel (Kg/Tdn)</th>
-                                            <th className="text-end">PPH</th>
+                                            <th className="text-end">Weight In</th>
+                                            <th className="text-end">Weight Out</th>
+                                            <th className="text-end">Net Gross</th>
+                                            <th className="text-end">Loose Weight</th>
+                                            <th className="text-end">Komidel</th>
+                                            <th className="text-end">Penalty</th>
+                                            <th className="text-end">Net Weight</th>
+                                            <th className="text-end">Price</th>
+                                            <th className="text-end">(0.25%)</th>
+                                            <th className="text-end">Rejected Weight</th>
                                             <th className="text-end">Total</th>
                                         </tr>
                                     </thead>
@@ -682,12 +683,14 @@ const SPSummary = () => {
                                                 <td className="text-end">{item.weightOut || '0'}</td>
                                                 <td className="text-end">{item.netGross || '0'}</td>
                                                 <td className="text-end">{item.looseWeight || '0'}</td>
+                                                <td className="text-end">{item.komidel || '0'}</td>
                                                 <td className="text-end">{item.penalty || '0'}</td>
                                                 <td className="text-end">{item.netWeight || '0'}</td>
                                                 <td className="text-end">{item.price || '0'}</td>
-                                                <td className="text-end">{item.komidel || '0'}</td>
                                                 <td className="text-end">{item.pph || '0'}</td>
+                                                <td className="text-end">{item.rejectedWeight || '0'}</td>
                                                 <td className="text-end">{item.total || '0'}</td>
+                                               
                                             </tr>
                                         ))}
                                     </tbody>

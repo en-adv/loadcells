@@ -36,15 +36,13 @@ router.post('/', async (req, res) => {
             vehicleId: req.body.vehicleId,
             weightIn: req.body.weightIn,
             weightOut: req.body.weightOut,
-            looseWeight: req.body.looseWeight,
-            looseWeightPrice: req.body.looseWeightPrice,
-            bunches: req.body.bunches,
-            penalty: req.body.penalty,
-            price: req.body.price,
+            looseWeight: req.body.looseWeight || 0,
+            penalty: req.body.penalty || 0,
+            price: req.body.price || 0,
             komidel: req.body.komidel,
             fruitType: req.body.fruitType,
-            rejectedBunches: req.body.rejectedBunches,
-            rejectedWeight: req.body.rejectedWeight
+            rejectedBunches: req.body.rejectedBunches || 0,
+            rejectedWeight: req.body.rejectedWeight || 0
         });
 
         const savedSP = await newSP.save();
@@ -65,8 +63,6 @@ router.put('/:id', async (req, res) => {
                 weightIn: req.body.weightIn,
                 weightOut: req.body.weightOut,
                 looseWeight: req.body.looseWeight,
-                looseWeightPrice: req.body.looseWeightPrice,
-                bunches: req.body.bunches,
                 penalty: req.body.penalty,
                 price: req.body.price,
                 komidel: req.body.komidel,
@@ -137,110 +133,7 @@ router.get('/date-range/:start/:end', async (req, res) => {
     }
 });
 
-// Get totals by fruit type
-router.get('/totals/by-fruit-type', async (req, res) => {
-    try {
-        const totals = await SP.aggregate([
-            {
-                $group: {
-                    _id: '$fruitType',
-                    totalNetWeight: { $sum: '$netWeight' },
-                    totalNetWeightAmount: {
-                        $sum: {
-                            $multiply: ['$netWeight', '$netWeightPrice']
-                        }
-                    },
-                    totalBunches: { $sum: '$bunches' },
-                    totalRejectedBunches: { $sum: '$rejectedBunches' },
-                    totalLooseWeight: { $sum: '$looseWeight' },
-                    totalLooseWeightAmount: { 
-                        $sum: { 
-                            $multiply: ['$looseWeight', '$looseWeightPrice'] 
-                        } 
-                    },
-                    totalRejectedWeight: { $sum: '$rejectedWeight' },
-                    totalRejectedWeightAmount: {
-                        $sum: {
-                            $multiply: ['$rejectedWeight', '$rejectedWeightPrice']
-                        }
-                    }
-                }
-            }
-        ]);
-        
-        res.json(totals);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Get total amounts
-router.get('/totals/amounts', async (req, res) => {
-    try {
-        const totals = await SP.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    totalNetWeightAmount: {
-                        $sum: { $multiply: ['$netWeight', '$netWeightPrice'] }
-                    },
-                    totalLooseWeightAmount: {
-                        $sum: { $multiply: ['$looseWeight', '$looseWeightPrice'] }
-                    },
-                    totalRejectedWeightAmount: {
-                        $sum: { $multiply: ['$rejectedWeight', '$rejectedWeightPrice'] }
-                    },
-                    totalBunchesAmount: {
-                        $sum: { $multiply: ['$bunches', '$komidel'] }
-                    },
-                    totalRejectedBunchesAmount: {
-                        $sum: { $multiply: ['$rejectedBunches', '$komidel'] }
-                    }
-                }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    totalNetWeightAmount: 1,
-                    totalLooseWeightAmount: 1,
-                    totalRejectedWeightAmount: 1,
-                    totalBunchesAmount: 1,
-                    totalRejectedBunchesAmount: 1,
-                    grandTotal: {
-                        $subtract: [
-                            {
-                                $add: [
-                                    '$totalNetWeightAmount',
-                                    '$totalLooseWeightAmount',
-                                    '$totalRejectedWeightAmount'
-                                ]
-                            },
-                            {
-                                $add: [
-                                    '$totalBunchesAmount',
-                                    '$totalRejectedBunchesAmount'
-                                ]
-                            }
-                        ]
-                    }
-                }
-            }
-        ]);
-        
-        res.json(totals[0] || {
-            totalNetWeightAmount: 0,
-            totalLooseWeightAmount: 0,
-            totalRejectedWeightAmount: 0,
-            totalBunchesAmount: 0,
-            totalRejectedBunchesAmount: 0,
-            grandTotal: 0
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Get totals
+// Get totals summary
 router.get('/totals/summary', async (req, res) => {
     try {
         const totals = await SP.aggregate([
@@ -248,10 +141,8 @@ router.get('/totals/summary', async (req, res) => {
                 $group: {
                     _id: null,
                     totalNetWeight: { $sum: '$netWeight' },
-                    totalLooseWeight: { $sum: '$looseWeight' },
-                    totalBunches: { $sum: '$bunches' },
-                    totalRejectedBunches: { $sum: '$rejectedBunches' },
                     totalRejectedWeight: { $sum: '$rejectedWeight' },
+                    totalPph: { $sum: '$pph' },
                     totalAmount: { $sum: '$total' }
                 }
             },
@@ -259,10 +150,8 @@ router.get('/totals/summary', async (req, res) => {
                 $project: {
                     _id: 0,
                     totalNetWeight: 1,
-                    totalLooseWeight: 1,
-                    totalBunches: 1,
-                    totalRejectedBunches: 1,
                     totalRejectedWeight: 1,
+                    totalPph: 1,
                     totalAmount: 1
                 }
             }
@@ -270,10 +159,8 @@ router.get('/totals/summary', async (req, res) => {
         
         res.json(totals[0] || {
             totalNetWeight: 0,
-            totalLooseWeight: 0,
-            totalBunches: 0,
-            totalRejectedBunches: 0,
             totalRejectedWeight: 0,
+            totalPph: 0,
             totalAmount: 0
         });
     } catch (error) {

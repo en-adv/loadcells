@@ -29,14 +29,6 @@ const SPSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    looseWeightPrice: {
-        type: Number,
-        default: 0
-    },
-    bunches: {
-        type: Number,
-        default: 0
-    },
     penalty: {
         type: Number,
         default: 0
@@ -69,12 +61,15 @@ const SPSchema = new mongoose.Schema({
     total: {
         type: Number,
         default: 0
+    },
+    pph: {
+        type: Number,
+        default: 0
     }
 });
 
-// Calculate netGross, netWeight, and total before saving or updating
+// Updated calculation logic to match Pabrik Dashboard
 SPSchema.pre(['save', 'updateOne', 'findOneAndUpdate'], function(next) {
-    // If this is an update operation, get the update object
     const update = this.getUpdate ? this.getUpdate() : this;
     
     // Calculate netGross = Weight In - Weight Out
@@ -87,13 +82,15 @@ SPSchema.pre(['save', 'updateOne', 'findOneAndUpdate'], function(next) {
         update.netWeight = update.netGross - (update.penalty || 0);
     }
 
-    // Calculate total = (Net Weight × Price) + (Loose Weight × Loose Weight Price) - (Bunches × 16) - (Rejected Bunches × 8)
-    const netWeightAmount = (update.netWeight || 0) * (update.price || 0);
-    const looseWeightAmount = (update.looseWeight || 0) * (update.looseWeightPrice || 0);
-    const bunchesAmount = (update.bunches || 0) * 16;
-    const rejectedBunchesAmount = (update.rejectedBunches || 0) * 8;
+    // Calculate PPH (0.25% of net amount)
+    const netAmount = (update.netWeight || 0) * (update.price || 0);
+    update.pph = netAmount * 0.0025;
 
-    update.total = netWeightAmount + looseWeightAmount - bunchesAmount - rejectedBunchesAmount;
+    // Calculate total = (Net Weight × Price) - (Rejected Weight × 8) - (Net Gross × 16) - PPH (0.25%)
+    const rejectedDeduction = (update.rejectedWeight || 0) * 8;
+    const netGrossDeduction = (update.netGross || 0) * 16;
+
+    update.total = netAmount - rejectedDeduction - netGrossDeduction - update.pph;
     
     next();
 });

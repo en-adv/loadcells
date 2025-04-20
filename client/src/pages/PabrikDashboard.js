@@ -3,7 +3,7 @@ import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { format, parseISO } from "date-fns";
 import { id } from "date-fns/locale";
-import { FaSearch, FaSort, FaSortUp, FaSortDown, FaSave, FaTrash, FaEdit, FaFileExcel, FaSignOutAlt } from "react-icons/fa";
+import { FaSearch, FaSort, FaSortUp, FaSortDown, FaSave, FaTrash, FaEdit, FaFileExcel, FaSignOutAlt, FaPrint } from "react-icons/fa";
 import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,7 +23,6 @@ const DashboardInputPS = () => {
     const [looseWeight, setLooseWeight] = useState("");
     const [rejectedWeight, setRejectedWeight] = useState("");
     const [komidel, setKomidel] = useState("");
-    const [pph, setPph] = useState("");
     const [total, setTotal] = useState("");
     const [entries, setEntries] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
@@ -55,13 +54,14 @@ const DashboardInputPS = () => {
         const netWeightCalc = netGrossCalc - Number(penalty || 0);
         setNetWeight(netWeightCalc);
 
-        // Calculate total with PPH deduction
+        // Calculate total with fixed 0.25% PPH
+        const pphCalc = (netWeightCalc * Number(price || 0)) * 0.0025; // 0.25%
         const totalCalc = (netWeightCalc * Number(price || 0)) - 
                          (Number(rejectedWeight || 0) * 8) - 
                          (netGrossCalc * 16) - 
-                         (Number(pph || 0));
+                         pphCalc;
         setTotal(totalCalc);
-    }, [weightIn, weightOut, penalty, price, rejectedWeight, pph]);
+    }, [weightIn, weightOut, penalty, price, rejectedWeight]);
 
     useEffect(() => {
         const fetchTodayTotals = async () => {
@@ -148,7 +148,6 @@ const DashboardInputPS = () => {
             setRejectedWeight(entryToEdit.rejectedWeight || "");
             setKomidel(entryToEdit.komidel || "");
             setPrice(entryToEdit.price || "");
-            setPph(entryToEdit.pph || "");
         }
     };
 
@@ -217,7 +216,6 @@ const DashboardInputPS = () => {
             setNetGross(""); 
             setNetWeight("");
             setPrice("");
-            setPph("");
             
             // Refresh data
             const updatedEntries = await axios.get(`${API_URL}/api/sp`);
@@ -246,14 +244,22 @@ const DashboardInputPS = () => {
             'Weight In (Kg)': item.weightIn || 0,
             'Weight Out (Kg)': item.weightOut || 0,
             'Net Gross (Kg)': item.netGross || 0,
+            'UB (Rp)': (item.netGross || 0) * 16,
             'Loose Weight (Kg)': item.looseWeight || 0,
             'Penalty (Kg)': item.penalty || 0,
             'Net Weight (Kg)': item.netWeight || 0,
             'Price (Rp)': item.price || 0,
+            'Net_Price (Rp)': (item.netWeight || 0) * (item.price || 0),
+            'PPH (0.25%)': (item.netWeight || 0) * (item.price || 0) * 0.0025,
             'Komidel (Kg/Tdn)': item.komidel || 0,
             'Jenis Buah': item.fruitType,
             'Rejected Weight (Kg)': item.rejectedWeight || 0,
-            'Total (Rp)': item.total || 0
+            'UM (Rp)': (item.rejectedWeight || 0) * 8,
+           
+            'Total (Rp)': (item.netWeight || 0) * (item.price || 0) - 
+                          (item.rejectedWeight || 0) * 8 - 
+                          (item.netGross || 0) * 16 - 
+                          ((item.netWeight || 0) * (item.price || 0)) * 0.0025
         }));
 
         // Create workbook
@@ -261,8 +267,124 @@ const DashboardInputPS = () => {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Surat Pengantar");
         
-        // Save Excel file
-        XLSX.writeFile(wb, 'surat-pengantar.xlsx');
+        // Save Excel file with current date
+        const today = new Date();
+        const dateString = format(today, "yyyyMMdd");
+        XLSX.writeFile(wb, `surat-pengantar-${dateString}.xlsx`);
+    };
+
+    const handlePrint = async (item) => {
+        try {
+            // Validate required fields with defaults
+            const printData = {
+                date: item.date || new Date().toISOString(),
+                docReference: item.docReference || "-",
+                vehicleId: item.vehicleId || "-",
+                weightIn: item.weightIn || 0,
+                weightOut: item.weightOut || 0,
+                netGross: item.netGross || 0,
+                looseWeight: item.looseWeight || 0,
+                komidel: item.komidel || 0,
+                penalty: item.penalty || 0,
+                netWeight: item.netWeight || 0,
+                price: item.price || 0,
+                rejectedWeight: item.rejectedWeight || 0,
+                fruitType: item.fruitType || "-",
+            };
+
+            // Calculate Final Price
+            const finalPrice = (printData.netWeight * printData.price) - 
+                              (printData.rejectedWeight * 8) - 
+                              (printData.netGross * 16) - 
+                              ((printData.netWeight * printData.price) * 0.0025);
+
+            // Generate Invoice Text for preview
+            const previewText = 
+                `Tanggal          : ${printData.date ? format(parseISO(printData.date), "dd MMM yyyy HH:mm", { locale: id }) : '-'}\n` +
+                `Doc Reference    : ${printData.docReference}\n` +
+                `Vehicle ID       : ${printData.vehicleId}\n` +
+                `Weight In        : ${printData.weightIn.toLocaleString()} Kg\n` +
+                `Weight Out       : ${printData.weightOut.toLocaleString()} Kg\n` +
+                `Net Gross        : ${printData.netGross.toLocaleString()} Kg\n` +
+                `Loose Weight     : ${printData.looseWeight.toLocaleString()} Kg\n` +
+                `Komidel          : ${printData.komidel.toLocaleString()} Kg/Tdn\n` +
+                `Penalty          : ${printData.penalty.toLocaleString()} Kg\n` +
+                `Net Weight       : ${printData.netWeight.toLocaleString()} Kg\n` +
+                `Price/Kg         : Rp ${printData.price.toLocaleString()}\n` +
+                `PPH (0.25%)      : Rp ${((printData.netWeight * printData.price) * 0.0025).toLocaleString()}\n` +
+                `Rejected Weight  : ${printData.rejectedWeight.toLocaleString()} Kg\n` +
+                `Jenis Buah       : ${printData.fruitType}\n` +
+                `Total            : Rp ${finalPrice.toLocaleString()}`;
+
+            // Show preview popup
+            const shouldPrint = window.confirm(
+                "Preview Nota:\n\n" + previewText + "\n\nKlik OK untuk mencetak."
+            );
+
+            if (!shouldPrint) {
+                return; // User cancelled
+            }
+
+            // Proceed with printing
+            console.log("Printing data:", printData);
+
+            // 1. Request Bluetooth Device
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["000018f0-0000-1000-8000-00805f9b34fb"],
+            });
+
+            // 2. Connect to Device
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService("000018f0-0000-1000-8000-00805f9b34fb");
+            const characteristic = await service.getCharacteristic("00002af1-0000-1000-8000-00805f9b34fb");
+
+            // 3. Generate ESC/POS formatted invoice text
+            const ESC = "\x1B";
+            const CENTER = ESC + "\x61\x01";
+            const LEFT = ESC + "\x61\x00";
+            const BOLD_ON = ESC + "\x45\x01";
+            const BOLD_OFF = ESC + "\x45\x00";
+            const FONT_DOUBLE = ESC + "\x21\x21";
+            const FONT_NORMAL = ESC + "\x21\x21";
+            const LINE_FEED = "\n";
+            const SEPARATOR = "================================\n";
+
+            const invoiceText =
+                LINE_FEED +
+                CENTER + FONT_DOUBLE + "Slip Pembayaran SP\n" + FONT_NORMAL +
+                CENTER + BOLD_ON + " * Bintang Sawit Makmur *\n" + BOLD_OFF +
+                SEPARATOR +
+                LEFT +
+                `Tanggal          : ${printData.date ? format(parseISO(printData.date), "dd MMM yyyy HH:mm", { locale: id }) : '-'}\n` +
+                `Doc Reference    : ${printData.docReference}\n` +
+                `Vehicle ID       : ${printData.vehicleId}\n` +
+                `Weight In        : ${printData.weightIn.toLocaleString()} Kg\n` +
+                `Weight Out       : ${printData.weightOut.toLocaleString()} Kg\n` +
+                `Net Gross        : ${printData.netGross.toLocaleString()} Kg\n` +
+                `Loose Weight     : ${printData.looseWeight.toLocaleString()} Kg\n` +
+                `Komidel          : ${printData.komidel.toLocaleString()} Kg/Tdn\n` +
+                `Penalty          : ${printData.penalty.toLocaleString()} Kg\n` +
+                `Net Weight       : ${printData.netWeight.toLocaleString()} Kg\n` +
+                `Price/Kg         : Rp ${printData.price.toLocaleString()}\n` +
+                `PPH (0.25%)      : Rp ${((printData.netWeight * printData.price) * 0.0025).toLocaleString()}\n` +
+                `Rejected Weight  : ${printData.rejectedWeight.toLocaleString()} Kg\n` +
+                `Jenis Buah       : ${printData.fruitType}\n` +
+                FONT_DOUBLE + `Total           : Rp ${finalPrice.toLocaleString()}\n` + FONT_NORMAL +
+                SEPARATOR +
+                CENTER + "Terima Kasih!\n" +
+                LINE_FEED.repeat(3);
+
+            // 4. Send to Printer
+            const encoder = new TextEncoder();
+            const data = encoder.encode(invoiceText);
+            await characteristic.writeValue(data);
+
+            alert("Nota berhasil dikirim ke printer ✅");
+        } catch (error) {
+            console.error("Gagal mencetak:", error);
+            alert(`Gagal mengirim nota ke printer ❌\nError: ${error.message}`);
+        }
     };
 
     return (
@@ -443,13 +565,12 @@ const DashboardInputPS = () => {
                                         />
                                     </div>
                                     <div className="form-group mb-3">
-                                        <label className="form-label">PPH (%)</label>
+                                        <label className="form-label">PPH (0.25%)</label>
                                         <input 
-                                            type="number" 
-                                            className="form-control" 
-                                            value={pph} 
-                                            onChange={(e) => setPph(e.target.value)}
-                                            step="0.01"
+                                            type="text" 
+                                            className="form-control bg-light" 
+                                            value={formatCurrency((netWeight * Number(price || 0)) * 0.0025)}
+                                            disabled
                                         />
                                     </div>
                                     
@@ -474,11 +595,18 @@ const DashboardInputPS = () => {
                                         <div className="card-body">
                                             <div className="row align-items-center">
                                                 <div className="col">
-                                                    <h6 className="mb-0">Total Amount</h6>
-                                                    <small className="text-muted">
-                                                        (Net Weight × Price) - (Rejected Weight × 8) - (Net Gross × 16) - PPH
+                                                    <h5 className="mb-0">Total Amount</h5>
+                                                    <small className="text-muted d-block">
+                                                        <div className="mt-2">
+                                                            <h5 className="d-flex flex-wrap gap-2 mb-3">
+                                                                <span className="text-primary me-2">Net_Price: {formatCurrency((netWeight * Number(price || 0)))}</span>
+                                                                <span className="text-danger me-2">PPH: {formatCurrency((netWeight * Number(price || 0)) * 0.0025)}</span>
+                                                                <span className="text-danger me-2">UB: {formatCurrency(Number(netGross || 0) * 16)}</span>
+                                                                <span className="text-danger">UM: {formatCurrency(Number(rejectedWeight || 0) * 8)}</span>
+                                                            </h5>
+                                                        </div>
                                                     </small>
-                                                </div>
+                                                </div> 
                                                 <div className="col-auto">
                                                     <h4 className="mb-0 text-primary">{formatCurrency(total)}</h4>
                                                 </div>
@@ -539,13 +667,13 @@ const DashboardInputPS = () => {
                                 </div>
                             </div>
 
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle">
+                            <div className="table-responsive" style={{ overflowX: "auto" }}>
+                                <table className="table table-hover align-middle" style={{ minWidth: "1000px" }}>
                                     <thead>
                                         <tr className="table-light">
                                             <th 
                                                 onClick={() => handleSort("date")} 
-                                                style={{ cursor: "pointer" }}
+                                                style={{ cursor: "pointer", minWidth: "150px" }}
                                                 className="text-nowrap"
                                             >
                                                 Tanggal
@@ -556,7 +684,7 @@ const DashboardInputPS = () => {
                                             </th>
                                             <th 
                                                 onClick={() => handleSort("docReference")} 
-                                                style={{ cursor: "pointer" }}
+                                                style={{ cursor: "pointer", minWidth: "120px" }}
                                                 className="text-nowrap"
                                             >
                                                 Doc Reference
@@ -567,7 +695,7 @@ const DashboardInputPS = () => {
                                             </th>
                                             <th 
                                                 onClick={() => handleSort("vehicleId")} 
-                                                style={{ cursor: "pointer" }}
+                                                style={{ cursor: "pointer", minWidth: "100px" }}
                                                 className="text-nowrap"
                                             >
                                                 Vehicle ID
@@ -576,17 +704,19 @@ const DashboardInputPS = () => {
                                                 )}
                                                 {sortConfig.key !== "vehicleId" && <FaSort className="ms-1" />}
                                             </th>
-                                            <th className="text-end">Weight In (Kg)</th>
-                                            <th className="text-end">Weight Out (Kg)</th>
-                                            <th className="text-end">Net Gross (Kg)</th>
-                                            <th className="text-end">Loose Weight (Kg)</th>
-                                            <th className="text-end">Penalty (Kg)</th>
-                                            <th className="text-end">Net Weight (Kg)</th>
-                                            <th className="text-end">Price (Rp)</th>
-                                            <th className="text-end">Komidel (Kg/Tdn)</th>
+                                            <th className="text-end">Weight In)</th>
+                                            <th className="text-end">Weight Out</th>
+                                            <th className="text-end">Net Gross</th>
+                                            <th className="text-end">Loose Weight</th>
+                                            <th className="text-end">Komidel</th>
+                                            <th className="text-end">Penalty</th>
+                                            <th className="text-end">Net Weight</th>
+                                            <th className="text-end">Price</th>
+                                            <th className="text-end">(0.25%)</th>
+                                            <th className="text-end">Rejected Weight</th>
                                             <th 
                                                 onClick={() => handleSort("fruitType")} 
-                                                style={{ cursor: "pointer" }}
+                                                style={{ cursor: "pointer", minWidth: "120px" }}
                                                 className="text-nowrap"
                                             >
                                                 Jenis Buah
@@ -595,7 +725,7 @@ const DashboardInputPS = () => {
                                                 )}
                                                 {sortConfig.key !== "fruitType" && <FaSort className="ms-1" />}
                                             </th>
-                                            <th className="text-end">Rejected Weight (Kg)</th>
+                                           
                                             <th className="text-end">Total (Rp)</th>
                                             <th className="text-center">Actions</th>
                                         </tr>
@@ -612,17 +742,34 @@ const DashboardInputPS = () => {
                                                 <td className="text-end">{(item.weightOut || 0).toLocaleString()} Kg</td>
                                                 <td className="text-end">{(item.netGross || 0).toLocaleString()} Kg</td>
                                                 <td className="text-end">{(item.looseWeight || 0).toLocaleString()} Kg</td>
+                                                <td className="text-end">{(item.komidel || 0).toLocaleString()} Kg/Tdn</td>
                                                 <td className="text-end">{(item.penalty || 0).toLocaleString()} Kg</td>
                                                 <td className="text-end">{(item.netWeight || 0).toLocaleString()} Kg</td>
                                                 <td className="text-end">{formatCurrency(item.price || 0)}</td>
-                                                <td className="text-end">{(item.komidel || 0).toLocaleString()} Kg/Tdn</td>
-                                                <td>{item.fruitType || '-'}</td>
+                                                <td className="text-end">
+                                                    {formatCurrency((item.netWeight || 0) * (item.price || 0) * 0.0025)}
+                                                </td>
                                                 <td className="text-end">{(item.rejectedWeight || 0).toLocaleString()} Kg</td>
-                                                <td className="text-end fw-bold">{formatCurrency(item.total || 0)}</td>
+                                                <td>{item.fruitType || '-'}</td>
+                                                <td className="text-end fw-bold">
+                                                    {formatCurrency(
+                                                        (item.netWeight || 0) * (item.price || 0) - 
+                                                        (item.rejectedWeight || 0) * 8 - 
+                                                        (item.netGross || 0) * 16 - 
+                                                        ((item.netWeight || 0) * (item.price || 0)) * 0.0025
+                                                    )}
+                                                </td>
                                                 <td className="text-center">
                                                     <div className="btn-group">
                                                         <button 
-                                                            className="btn btn-sm btn-outline-primary"
+                                                            className="btn btn-sm btn-success me-2"
+                                                            onClick={() => handlePrint(item)}
+                                                            style={{ padding: "0.5rem 1rem" }}
+                                                        >
+                                                            <FaPrint className="me-1" /> Print
+                                                        </button>
+                                                        <button 
+                                                            className="btn btn-sm btn-outline-primary me-2"
                                                             onClick={() => handleEdit(item._id)}
                                                         >
                                                             <FaEdit />
